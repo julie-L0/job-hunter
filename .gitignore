@@ -1,0 +1,12 @@
+# 密钥绝不进版本库。.env.example 是占位模板，留着
+.env
+.env.*
+*.env
+!.env.example
+
+node_modules/
+.DS_Store
+.vercel
+
+# 本机的权限授予，跟别人无关
+.claude/settings.local.json

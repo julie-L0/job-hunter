@@ -1,0 +1,16 @@
+{
+  "name": "job-hunter",
+  "version": "0.1.0",
+  "description": "秋招管理系统",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file=.env src/dev-server.js",
+    "start": "node --env-file=.env src/dev-server.js",
+    "check": "node --env-file=.env src/scripts/check.js",
+    "init-tags": "node --env-file=.env src/scripts/init-tags.js",
+    "recompute": "node --env-file=.env src/scripts/recompute.js"
+  }
+}
