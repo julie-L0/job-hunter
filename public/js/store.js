@@ -34,6 +34,15 @@ export const currentJobRef = computed(
   () => state.jobs.find((job) => job.recordId === state.currentJobId) || null,
 );
 
+/**
+ * 岗位名为空 = 只攒了公司和秋招网址，具体岗位还没找。这类记录不进六列看板，
+ * 单独归到「待定公司」；填上岗位名它就自动转正。不额外占一个状态选项。
+ */
+export const isPending = (job) => !String(job?.position || "").trim();
+export const pendingJobs = computed(() => state.jobs.filter(isPending));
+/** 四个 AI 功能页要的是「有具体岗位」，光有公司名喂不出有用的东西，白花一次调用。 */
+export const jobReady = computed(() => Boolean(currentJobRef.value) && !isPending(currentJobRef.value));
+
 export function setCurrentJob(recordId) {
   state.currentJobId = recordId || null;
   currentJob.save(recordId);

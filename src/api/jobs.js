@@ -38,7 +38,9 @@ export const jobRoutes = [
     method: "POST",
     path: "/api/jobs",
     handler: async ({ body }) => {
-      requireBody(body, ["company", "position"]);
+      // 只要公司名。岗位名留空是一种正常状态：先攒下公司和秋招网址，
+      // 之后再去翻这家公司有哪些岗位合适。填上岗位名就自动进入投递流程。
+      requireBody(body, ["company"]);
       const job = await createRecord("main", { status: "待投", ...pickPatch(body) });
       return job;
     },

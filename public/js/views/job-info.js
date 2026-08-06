@@ -6,8 +6,10 @@ import {
   currentJobRef,
   dropJob,
   handleError,
+  isPending,
   mergeJob,
   resumeCodes,
+  setCurrentJob,
   state,
   statuses,
   toast,
@@ -21,6 +23,14 @@ const INTRO_FIELDS = [
   ["intro3min", "3 分钟"],
   ["intro5min", "5 分钟"],
   ["introEn", "英文"],
+];
+
+// 一家公司一批批开岗位，公司级的这几项每次重打一遍纯属浪费，所以新建同公司岗位时带过去
+const CARRY = [
+  ["company", "公司名"],
+  ["siteUrl", "官网链接"],
+  ["referralCode", "内推码"],
+  ["companyBackground", "公司背景备注"],
 ];
 
 export const JobInfo = {
@@ -71,10 +81,29 @@ export const JobInfo = {
       }
     }
 
+    async function addSibling() {
+      const source = job.value;
+      const carried = CARRY.filter(([key]) => source[key]);
+      const ok = await confirmDialog({
+        title: `在「${source.company}」下再加一个岗位？`,
+        body: `新建一条记录，把 ${carried.map(([, label]) => label).join("、")} 带过去，`
+          + "岗位名和 JD 留空由你填。当前这条不动。",
+      });
+      if (!ok) return;
+      try {
+        const created = await api.createJob(Object.fromEntries(carried.map(([key]) => [key, source[key]])));
+        mergeJob(created);
+        setCurrentJob(created.recordId);
+        toast(`已在「${source.company}」下新建一条，填上岗位名和 JD 就能用 AI 功能`);
+      } catch (failure) {
+        if (!handleError(failure)) toast(failure.message);
+      }
+    }
+
     async function remove() {
       const target = job.value;
       const ok = await confirmDialog({
-        title: `删除「${target.company} · ${target.position}」？`,
+        title: `删除「${target.company} · ${target.position || "待定岗位"}」？`,
         body: "会从飞书主表里删掉这条记录，删了拿不回来。简历库的投递记录会自动重算。",
         danger: true,
       });
@@ -95,15 +124,24 @@ export const JobInfo = {
 
     return {
       state, job, statuses, resumeCodes, docBusy, docError, orphanDocUrl,
-      introDone, save, orNull, dayStr, createDoc, remove,
+      introDone, save, orNull, dayStr, createDoc, remove, addSibling, isPending,
     };
   },
   template: `
     <NeedJob v-if="!job" what="岗位信息" />
     <div v-else class="page">
-      <h2 class="ptitle">{{ job.company }} · {{ job.position }}</h2>
+      <h2 class="ptitle">{{ job.company }} · {{ job.position || '（待定岗位）' }}</h2>
+
+      <p v-if="isPending(job)" class="notice">
+        这条只有公司。填上<strong>岗位名</strong>它就自动从看板的「待定公司」转进「待投」列；
+        再把 JD 粘进来，自我介绍、面试准备、Mock 面试三页就能用了。
+      </p>
 
       <div class="fields">
+        <FieldRow label="公司名" :value="job.company || ''"
+          :disabled="state.offline" :save="save('company')" />
+        <FieldRow label="岗位名" :value="job.position || ''" placeholder="还没定就留空"
+          :disabled="state.offline" :save="save('position')" />
         <FieldRow label="状态" type="select" :options="statuses" :value="job.status"
           :empty-option="''" :disabled="state.offline" :save="save('status')" />
         <FieldRow label="简历编号" type="select" :options="resumeCodes" :value="job.resumeId || ''"
@@ -148,6 +186,12 @@ export const JobInfo = {
           {{ item.label }}{{ item.done ? ' ✓' : '' }}
         </span>
         <a class="ghost" href="#/job/intro">去生成</a>
+      </section>
+
+      <section class="strip">
+        <span class="flabel">同一家公司</span>
+        <button class="ghost" :disabled="state.offline" @click="addSibling">同公司再加一个岗位</button>
+        <span class="muted">公司名、官网链接、内推码、公司背景备注会带过去，不用重打。</span>
       </section>
 
       <section class="strip danger-zone">

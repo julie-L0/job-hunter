@@ -1,7 +1,7 @@
 // 网申填表（F5）。三步：粘原文 → 拆题核对 → 逐题生成和改稿。
 // 不写回 bitable（PRD F5 明确），整个会话存 localStorage：网申填一半被打断是常事。
 import { api } from "../api.js";
-import { currentJobRef, handleError, state } from "../store.js";
+import { currentJobRef, handleError, jobReady, state } from "../store.js";
 import { NeedJob, confirmDialog, copyText, useDraft } from "../ui.js";
 
 const { computed, reactive, ref } = window.Vue;
@@ -120,6 +120,7 @@ export const Forms = {
     return {
       state,
       job,
+      jobReady,
       error,
       splitting,
       busy,
@@ -140,7 +141,7 @@ export const Forms = {
     };
   },
   template: `
-    <NeedJob v-if="!job" what="网申填表" />
+    <NeedJob v-if="!jobReady" what="网申填表" :job="job" />
     <div v-else class="page">
       <h2 class="ptitle">网申填表 · {{ job.company }} {{ job.position }}</h2>
       <p class="muted">把申请表页面的文字整段粘进来，AI 拆成题目，核对后逐题生成。

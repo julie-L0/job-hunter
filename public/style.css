@@ -398,7 +398,25 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .col article.urgent, .qlist article.urgent { border-left-color: var(--warn); }
 .col strong, .qlist strong, .closedlist strong { font-size: 14px; }
 .pos { font-size: 12px; color: var(--dim); }
-.col small, .qlist small, .closedlist small { font-size: 12px; color: var(--dim); }
+.col small, .qlist small, .closedlist small, .pendinglist small { font-size: 12px; color: var(--dim); }
+
+/* 待定公司：只有公司名，还没定岗位。横向平铺成一排，不占六列的位置 */
+.pendingbar { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.pendinglist { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.pendinglist article {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.pendinglist article.on { border-color: var(--accent-line); background: var(--accent-soft); }
+.pendinglist article.urgent { border-left: 2px solid var(--warn); }
+.pendinglist a { font-size: 12px; }
+
 .closedbar { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
 .closedlist { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .closedlist article {

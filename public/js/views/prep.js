@@ -1,7 +1,7 @@
 // 面试准备（F7）。材料区独立于「追加到准备文档」的结果显示：
 // 追加写文档失败不该把已经花过钱生成出来的材料一起丢掉。
 import { api } from "../api.js";
-import { currentJobRef, handleError, state } from "../store.js";
+import { currentJobRef, handleError, jobReady, state } from "../store.js";
 import { DraftBox, NeedJob, useDraft } from "../ui.js";
 
 const { computed, ref } = window.Vue;
@@ -53,10 +53,10 @@ export const Prep = {
       }
     }
 
-    return { state, job, busy, error, append, canAppend, drafted, generate, clear };
+    return { state, job, jobReady, busy, error, append, canAppend, drafted, generate, clear };
   },
   template: `
-    <NeedJob v-if="!job" what="面试准备" />
+    <NeedJob v-if="!jobReady" what="面试准备" :job="job" />
     <div v-else class="page">
       <h2 class="ptitle">面试准备 · {{ job.company }} {{ job.position }}</h2>
       <p class="muted">按 JD 和当前简历生成：可能被问的问题、要准备的例子、反问清单。不写回主表，只可选追加到准备文档。</p>

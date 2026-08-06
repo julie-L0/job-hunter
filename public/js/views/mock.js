@@ -2,7 +2,7 @@
 // 追问建议里的经历必须用下拉选：后端靠标题字符串精确匹配经历记录（src/api/ai.js:157），
 // 模型把标题写歪一个字 recordId 就是 null。AI 的输出不该当机器 key 用。
 import { api } from "../api.js";
-import { currentJobRef, handleError, mergeExperience, state, toast } from "../store.js";
+import { currentJobRef, handleError, jobReady, mergeExperience, state, toast } from "../store.js";
 import { NeedJob, confirmDialog, copyText, useDraft } from "../ui.js";
 
 const { computed, ref } = window.Vue;
@@ -142,13 +142,13 @@ export const Mock = {
     }
 
     return {
-      state, job, busy, error, input, session, started, ended, bubbles, markedCount,
+      state, job, jobReady, busy, error, input, session, started, ended, bubbles, markedCount,
       start, send, end, toggleMark, writeFollowup, exportMd, reset,
       copySummary: () => copyText(session.summary),
     };
   },
   template: `
-    <NeedJob v-if="!job" what="Mock 面试" />
+    <NeedJob v-if="!jobReady" what="Mock 面试" :job="job" />
     <div v-else class="page">
       <h2 class="ptitle">Mock 面试 · {{ job.company }} {{ job.position }}</h2>
 

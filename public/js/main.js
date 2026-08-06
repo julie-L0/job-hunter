@@ -128,7 +128,7 @@ const TopBar = {
       <template v-if="job">
         <span class="dot" :class="'s-' + job.status"></span>
         <button class="jobname" @click="picking = !picking">
-          {{ job.company }} · {{ job.position }} <span class="caret">▾</span>
+          {{ job.company }} · {{ job.position || '（待定岗位）' }} <span class="caret">▾</span>
         </button>
         <span class="pill">{{ job.status }}</span>
         <span v-if="job.deadline" class="pill" :class="{ warn: isUrgent(job) }">{{ ddlLabel(job.deadline) }}</span>

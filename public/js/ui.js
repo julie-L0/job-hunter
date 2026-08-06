@@ -269,7 +269,7 @@ export const JobPicker = {
       <option value="">（未选择岗位）</option>
       <optgroup v-for="group in groups" :key="group.status" :label="group.status">
         <option v-for="job in group.jobs" :key="job.recordId" :value="job.recordId">
-          {{ job.company }} · {{ job.position }}
+          {{ job.company }} · {{ job.position || '（待定岗位）' }}
         </option>
       </optgroup>
     </select>`,
@@ -277,10 +277,18 @@ export const JobPicker = {
 
 /** 四个岗位功能页共用的空态：没选岗位时给选择器，而不是渲染半个坏掉的表单。 */
 export const NeedJob = {
-  props: { what: { type: String, default: "这个功能" } },
+  props: { what: { type: String, default: "这个功能" }, job: { type: Object, default: null } },
   components: { JobPicker },
   template: `
-    <div class="empty">
+    <div v-if="job" class="empty">
+      <p class="etitle">{{ job.company }} 还没定岗位</p>
+      <p class="muted">这条现在只有公司和秋招网址。{{ what }}要拿具体岗位的 JD 来做，
+        没有 JD 生成出来的东西用不上，还白花一次调用。</p>
+      <p class="muted">去<a href="#/job/info">岗位信息</a>把岗位名和 JD 填上，这一页就自动可用。
+        这家公司开了多个岗位，也在那页「同公司再加一个岗位」。</p>
+      <JobPicker />
+    </div>
+    <div v-else class="empty">
       <p class="etitle">先选一个岗位</p>
       <p class="muted">{{ what }}要基于某个具体岗位的 JD 和简历来做。选定后它会一直跟着你，
         换到别的功能页不用再选一次。</p>

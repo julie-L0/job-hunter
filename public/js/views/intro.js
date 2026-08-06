@@ -1,7 +1,7 @@
 // 自我介绍（F6）。四个版本各对应主表一个字段。
 // AI 只出草稿，写回结构化字段必须点「写回」（PRD 原则 4）。草稿落 localStorage，刷新不丢。
 import { api } from "../api.js";
-import { currentJobRef, handleError, mergeJob, state, toast } from "../store.js";
+import { currentJobRef, handleError, jobReady, mergeJob, state, toast } from "../store.js";
 import { DraftBox, FieldRow, NeedJob, useDraft } from "../ui.js";
 
 const { computed, ref } = window.Vue;
@@ -58,6 +58,7 @@ export const Intro = {
     return {
       state,
       job,
+      jobReady,
       active,
       busy,
       error,
@@ -76,7 +77,7 @@ export const Intro = {
     };
   },
   template: `
-    <NeedJob v-if="!job" what="自我介绍" />
+    <NeedJob v-if="!jobReady" what="自我介绍" :job="job" />
     <div v-else class="page">
       <h2 class="ptitle">自我介绍 · {{ job.company }} {{ job.position }}</h2>
       <p class="muted">按 JD 和当前简历生成。已存过的版本标 ✓，重新生成不会直接覆盖，要点「写回」。</p>
