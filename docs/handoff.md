@@ -124,7 +124,7 @@ LARK_MOCK=1 LLM_MOCK=1 APP_PASSWORD=x npm run dev
 
 ### P2 待 lijue 决定
 
-- 这个目录还不是 git 仓库。前端 1600 行没有版本控制，改坏了没法回滚
+- **git 已 init**（2026-08-06，`main` 分支，首个提交 52 文件 5168 行）。`.gitignore` 排除 `.env` / `.env.*` / `.claude/settings.local.json` / `.DS_Store`，已用 `git check-ignore` 逐个验过。**还没连 GitHub**：本机没装 `gh`，装全局依赖和 `git push` 都是红线，要等她点头，并且仓库必须是 private（`.env.example` 里有她的 `open_id` 和 bitable token，`docs/` 里有 JD 和简历上下文）
 - 部署 Vercel（红线）。`vercel.json` 已配好 `includeFiles: prompts/**`，后台要填 10 个环境变量，`LLM_MOCK` / `LARK_MOCK` 一个都不能填
 - 飞书云空间里那两个诊断文档（`job-hunter 诊断-可删`、`测试公司-测试岗 面试准备`）已经授权给你了，可以自己删。`小柳数据` 是另一个项目的，没动
 
