@@ -70,6 +70,10 @@ export const api = {
   health: () => request("GET", "/api/health"),
   login: (password) => request("POST", "/api/auth/check", { password }),
 
+  companies: () => request("GET", "/api/companies"),
+  createCompany: (patch) => request("POST", "/api/companies", patch),
+  patchCompany: (recordId, patch) => request("PATCH", `/api/companies/${recordId}`, patch),
+
   jobs: () => request("GET", "/api/jobs"),
   createJob: (patch) => request("POST", "/api/jobs", patch),
   patchJob: (recordId, patch) => request("PATCH", `/api/jobs/${recordId}`, patch),

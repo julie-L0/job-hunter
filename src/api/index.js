@@ -2,7 +2,8 @@ import { createApp, HttpError } from "../http/app.js";
 import { config } from "../config.js";
 import { isMock } from "../llm/provider.js";
 import { listFields } from "../storage/bitable.js";
-import { JOB_STATUSES } from "../storage/schema.js";
+import { JOB_STATUSES, RESUME_REQUIRED_STATUSES } from "../storage/schema.js";
+import { companyRoutes } from "./companies.js";
 import { jobRoutes } from "./jobs.js";
 import { resumeRoutes } from "./resumes.js";
 import { experienceRoutes } from "./experiences.js";
@@ -20,6 +21,7 @@ const systemRoutes = [
       larkConfigured: Boolean(config.lark.appId && config.lark.appSecret),
       // 前端的看板列和状态下拉都从这里取，避免在前端再硬编码一份中文选项
       jobStatuses: JOB_STATUSES,
+      resumeRequiredStatuses: [...RESUME_REQUIRED_STATUSES],
     }),
   },
   {
@@ -43,6 +45,7 @@ const systemRoutes = [
 
 export const routes = [
   ...systemRoutes,
+  ...companyRoutes,
   ...jobRoutes,
   ...resumeRoutes,
   ...experienceRoutes,

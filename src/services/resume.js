@@ -1,8 +1,5 @@
 import { listRecords, batchUpdateRecords } from "../storage/bitable.js";
-import { RESUME_CODE_PATTERN } from "../storage/schema.js";
-
-// 待投 = 还没投出去，不计入简历的投递记录
-const APPLIED = new Set(["已投", "笔试", "一面", "二面", "三面", "挂", "offer"]);
+import { RESUME_CODE_PATTERN, RESUME_REQUIRED_STATUSES } from "../storage/schema.js";
 
 /** 取现有编号里 R{n} 的最大 n +1。不匹配格式的编号忽略，已删除编号的空缺不复用。 */
 export async function nextResumeCode(existing) {
@@ -28,7 +25,7 @@ export async function recomputeApplyRecords() {
 
   const byCode = new Map();
   for (const job of jobs) {
-    if (!job.resumeId || !APPLIED.has(job.status)) continue;
+    if (!job.resumeId || !RESUME_REQUIRED_STATUSES.has(job.status)) continue;
     const code = String(job.resumeId).trim();
     if (!byCode.has(code)) byCode.set(code, []);
     byCode.get(code).push(label(job));

@@ -2,12 +2,12 @@
 // 追加写文档失败不该把已经花过钱生成出来的材料一起丢掉。
 import { api } from "../api.js";
 import { currentJobRef, handleError, jobReady, state } from "../store.js";
-import { DraftBox, NeedJob, useDraft } from "../ui.js";
+import { DraftBox, NeedJob, PageJobPicker, useDraft } from "../ui.js";
 
 const { computed, ref } = window.Vue;
 
 export const Prep = {
-  components: { DraftBox, NeedJob },
+  components: { DraftBox, NeedJob, PageJobPicker },
   setup() {
     const job = currentJobRef;
     const busy = ref(false);
@@ -56,6 +56,7 @@ export const Prep = {
     return { state, job, jobReady, busy, error, append, canAppend, drafted, generate, clear };
   },
   template: `
+    <PageJobPicker />
     <NeedJob v-if="!jobReady" what="面试准备" :job="job" />
     <div v-else class="page">
       <h2 class="ptitle">面试准备 · {{ job.company }} {{ job.position }}</h2>

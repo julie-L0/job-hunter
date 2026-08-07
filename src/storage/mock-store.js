@@ -24,9 +24,14 @@ function tableOf(tableKey) {
   return tables.get(tableKey);
 }
 
-function insert(tableKey, patch) {
+function insert(tableKey, patch, ageDays = 0) {
   if (!tables.has(tableKey)) tables.set(tableKey, new Map());
-  const record = { record_id: nextRecordId(), fields: toFields(tableKey, patch) };
+  // created_time 跟真实飞书一样是毫秒。ageDays 只给预置数据用，好让「躺了多久」这条催办规则测得出来
+  const record = {
+    record_id: nextRecordId(),
+    fields: toFields(tableKey, patch),
+    created_time: Date.now() - ageDays * 86_400_000,
+  };
   tables.get(tableKey).set(record.record_id, record);
   return record;
 }
@@ -36,6 +41,12 @@ function mustGet(tableKey, recordId) {
   // 1254043 = 飞书的 RecordIdNotFound，保持和真实链路一致的错误形态
   if (!record) throw new LarkError(1254043, `记录不存在：${recordId}`);
   return record;
+}
+
+function writeResult(tableKey, record) {
+  const result = fromRecord(tableKey, record);
+  delete result.createdAt;
+  return result;
 }
 
 export function listRecords(tableKey) {
@@ -48,13 +59,13 @@ export function getRecord(tableKey, recordId) {
 
 export function createRecord(tableKey, patch) {
   tableOf(tableKey);
-  return fromRecord(tableKey, insert(tableKey, patch));
+  return writeResult(tableKey, insert(tableKey, patch));
 }
 
 export function updateRecord(tableKey, recordId, patch) {
   const record = mustGet(tableKey, recordId);
   Object.assign(record.fields, toFields(tableKey, patch));
-  return fromRecord(tableKey, record);
+  return writeResult(tableKey, record);
 }
 
 export function deleteRecord(tableKey, recordId) {
@@ -65,7 +76,7 @@ export function deleteRecord(tableKey, recordId) {
 
 export function batchCreateRecords(tableKey, patches) {
   tableOf(tableKey);
-  return patches.map((patch) => fromRecord(tableKey, insert(tableKey, patch)));
+  return patches.map((patch) => writeResult(tableKey, insert(tableKey, patch)));
 }
 
 export function batchUpdateRecords(tableKey, updates) {
@@ -96,8 +107,10 @@ const SEED_JOBS = [
     siteUrl: "https://example.com/careers/tencent" },
   { company: "美团", position: "产品运营-到家", status: "待投", deadline: inDays(9),
     duty: "到家业务商家侧运营策略的制定与执行" },
-  { company: "阿里巴巴", position: "产品专员", status: "待投", deadline: null,
+  { company: "阿里巴巴", position: "产品专员", status: "待投", deadline: null, age: 12,
     duty: "电商中台产品的需求梳理与流程优化", note: "官网还没开放投递，先建个坑位" },
+  { company: "蔚来", position: "用户运营", status: "待投", deadline: null, age: 3,
+    duty: "车主社区的活动策划与用户分层运营", note: "招满为止，没有截止日期" },
   { company: "小红书", position: "社区运营", status: "已投", deadline: inDays(14), resumeId: "R1",
     duty: "垂类社区的内容招募、话题运营与创作者激励",
     siteUrl: "https://example.com/careers/xiaohongshu", referralCode: "XHS88" },
@@ -177,8 +190,22 @@ function jd(company, position, duty) {
 }
 
 function seed() {
-  for (const { duty, ...job } of SEED_JOBS) {
-    insert("main", { ...job, jd: jd(job.company, job.position, duty) });
+  const companyIds = new Map();
+  for (const { duty, age, ...job } of SEED_JOBS) {
+    if (!companyIds.has(job.company)) {
+      const company = insert("company", {
+        name: job.company,
+        siteUrl: job.siteUrl || "",
+        companyBackground: job.companyBackground || "",
+        note: job.note || "",
+      });
+      companyIds.set(job.company, company.record_id);
+    }
+    insert("main", {
+      ...job,
+      companyId: companyIds.get(job.company),
+      jd: jd(job.company, job.position, duty),
+    }, age || 0);
   }
   for (const resume of SEED_RESUMES) insert("resume", resume);
   for (const experience of SEED_EXPERIENCES) insert("experience", experience);

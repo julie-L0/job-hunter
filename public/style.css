@@ -194,41 +194,6 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .content { flex: 1; padding: 20px; transition: opacity 0.15s; }
 .content.busy { opacity: 0.55; }
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 10px 20px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-}
-.jobname {
-  font: inherit;
-  font-weight: 600;
-  background: none;
-  border: 0;
-  padding: 0;
-  color: var(--ink);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.jobname.muted { font-weight: 400; }
-.caret { color: var(--dim); font-size: 11px; }
-.pickpop {
-  position: absolute;
-  top: 100%;
-  left: 16px;
-  z-index: 10;
-  padding: 10px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
-}
 .jobpick { max-width: 320px; }
 
 .banner {
@@ -310,6 +275,7 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .fstate { font-size: 12px; color: var(--dim); }
 .fstate.ok { color: var(--accent); }
 .fstate.bad { color: var(--warn); }
+.fhint { margin: 4px 0 0; font-size: 12px; }
 
 /* ---- AI 草稿框 ---- */
 
@@ -373,9 +339,6 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 
 /* ---- 看板：全部视图 ---- */
 
-.quickadd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
-.quickadd input { width: auto; flex: 0 1 190px; }
-
 .cols { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; align-items: start; }
 .col h3 { display: flex; align-items: baseline; gap: 6px; font-size: 12px; font-weight: 500; color: var(--dim); margin: 0 0 8px; }
 .col h3 em { font-style: normal; color: var(--ink); }
@@ -398,24 +361,7 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .col article.urgent, .qlist article.urgent { border-left-color: var(--warn); }
 .col strong, .qlist strong, .closedlist strong { font-size: 14px; }
 .pos { font-size: 12px; color: var(--dim); }
-.col small, .qlist small, .closedlist small, .pendinglist small { font-size: 12px; color: var(--dim); }
-
-/* 待定公司：只有公司名，还没定岗位。横向平铺成一排，不占六列的位置 */
-.pendingbar { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.pendinglist { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.pendinglist article {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  cursor: pointer;
-}
-.pendinglist article.on { border-color: var(--accent-line); background: var(--accent-soft); }
-.pendinglist article.urgent { border-left: 2px solid var(--warn); }
-.pendinglist a { font-size: 12px; }
+.col small, .qlist small, .closedlist small { font-size: 12px; color: var(--dim); }
 
 .closedbar { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
 .closedlist { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
@@ -514,6 +460,89 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .fups summary { color: var(--dim); cursor: pointer; }
 .fups article { margin-top: 8px; padding: 4px 0 4px 10px; border-left: 2px solid var(--line); }
 .fups p { margin: 4px 0 0; white-space: pre-wrap; line-height: 1.75; }
+/* ---- 公司库与显式岗位上下文 ---- */
+
+.board-summary { min-height: 24px; display: flex; justify-content: flex-end; align-items: center; }
+.company-create {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.7fr) minmax(220px, 1.3fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.company-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px; align-items: start; }
+.company-list { display: flex; flex-direction: column; gap: 6px; }
+.company-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  min-height: 68px;
+  padding: 11px 12px;
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.company-card:hover, .company-card.on { border-color: var(--accent-line); background: var(--accent-soft); }
+.company-card strong { overflow-wrap: anywhere; }
+.company-card span { color: var(--dim); font-size: 12px; }
+.company-card small {
+  grid-column: 1 / -1;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.company-detail { min-width: 0; padding-left: 20px; border-left: 1px solid var(--line); }
+.company-detail > header, .pagehead { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.company-detail h2 { margin: 0 0 4px; font-size: 18px; }
+.company-detail .meta { margin: 16px 0; }
+.company-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin: 18px 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.company-form label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.company-form label > span { color: var(--dim); font-size: 12px; }
+.company-form .wide { grid-column: 1 / -1; }
+.company-jobs { margin-top: 20px; }
+.company-jobs h3 { margin: 0 0 8px; font-size: 14px; }
+.company-jobs h3 em { color: var(--dim); font-style: normal; font-weight: 400; }
+.company-job {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.company-job:hover { border-color: var(--accent-line); }
+.company-job strong { overflow-wrap: anywhere; }
+.company-job small { color: var(--dim); white-space: nowrap; }
+.company-context { margin: 14px 0; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.company-context p { margin: 4px 0; white-space: pre-wrap; }
+.job-fields { margin-top: 18px; }
+.dangerzone { margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--line); }
+.page-job-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  color: var(--dim);
+  font-size: 12px;
+}
+.page-job-picker .jobpick { width: min(420px, 100%); max-width: none; }
+
 /* ---- 窄屏兜底。桌面优先，这里只保证「能用」，不做专门的移动端交互 ---- */
 
 @media (max-width: 900px) {
@@ -539,11 +568,19 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   .snav.on { border-bottom-color: var(--accent); }
   .sfoot { flex: none; padding: 0 12px; }
 
-  .topbar, .banner { padding: 10px 14px; }
+  .banner { padding: 10px 14px; }
   .content { padding: 14px; }
-  .pickpop { left: 14px; right: 14px; }
 
-  .cols, .quick, .fields { grid-template-columns: minmax(0, 1fr); }
+  .cols, .quick, .fields, .company-layout, .company-form { grid-template-columns: minmax(0, 1fr); }
+  .company-create { grid-template-columns: minmax(0, 1fr); }
+  .company-list { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
+  .company-card { flex: 0 0 220px; }
+  .company-detail { padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+  .company-form .wide { grid-column: 1; }
+  .company-job { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .company-job small { grid-column: 2 / -1; }
+  .page-job-picker { align-items: stretch; flex-direction: column; }
+  .page-job-picker .jobpick { width: 100%; }
   .bubble.user { align-self: stretch; }
   .furow select { flex: 1 1 100%; }
 

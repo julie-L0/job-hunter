@@ -2,7 +2,7 @@
 // AI 只出草稿，写回结构化字段必须点「写回」（PRD 原则 4）。草稿落 localStorage，刷新不丢。
 import { api } from "../api.js";
 import { currentJobRef, handleError, jobReady, mergeJob, state, toast } from "../store.js";
-import { DraftBox, FieldRow, NeedJob, useDraft } from "../ui.js";
+import { DraftBox, FieldRow, NeedJob, PageJobPicker, useDraft } from "../ui.js";
 
 const { computed, ref } = window.Vue;
 
@@ -14,7 +14,7 @@ const VARIANTS = [
 ];
 
 export const Intro = {
-  components: { DraftBox, FieldRow, NeedJob },
+  components: { DraftBox, FieldRow, NeedJob, PageJobPicker },
   setup() {
     const job = currentJobRef;
     const active = ref("1min");
@@ -77,6 +77,7 @@ export const Intro = {
     };
   },
   template: `
+    <PageJobPicker />
     <NeedJob v-if="!jobReady" what="自我介绍" :job="job" />
     <div v-else class="page">
       <h2 class="ptitle">自我介绍 · {{ job.company }} {{ job.position }}</h2>

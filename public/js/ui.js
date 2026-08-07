@@ -42,6 +42,29 @@ export function isUrgent(job) {
   return left !== null && left <= 3;
 }
 
+/**
+ * 招满为止的岗位没有投递DDL，风险随「加进来多久还没投」单调上升，所以另算一种紧迫。
+ * createdAt 是飞书记录自带的创建时间，不占字段。
+ */
+export function ageDays(job) {
+  if (!job?.createdAt) return null;
+  const days = daysLeft(job.createdAt);
+  return days === null ? null : -days;
+}
+
+export function ageLabel(job) {
+  const days = ageDays(job);
+  if (days === null) return "";
+  return days <= 0 ? "今天加入" : `躺了 ${days} 天`;
+}
+
+/** 没有 DDL 的待投岗位躺过一周 —— 用红字提醒，不占用 DDL 那条红边。 */
+export function isStale(job) {
+  if (job.status !== "待投" || job.deadline) return false;
+  const days = ageDays(job);
+  return days !== null && days >= 7;
+}
+
 export async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text || "");
@@ -128,6 +151,7 @@ export const FieldRow = {
     rows: { type: Number, default: 3 },
     placeholder: { type: String, default: "" },
     emptyOption: { type: String, default: "（空）" },
+    hint: { type: String, default: "" },
     wide: Boolean,
     disabled: Boolean,
     save: Function,
@@ -189,6 +213,7 @@ export const FieldRow = {
       </select>
       <input v-else :type="type === 'date' ? 'date' : 'text'" :disabled="disabled"
         :placeholder="placeholder" v-model="local" @change="commit()">
+      <p v-if="hint" class="muted fhint">{{ hint }}</p>
     </div>`,
 };
 
@@ -252,8 +277,8 @@ export const DraftBox = {
     </div>`,
 };
 
-/** 岗位选择器，按状态分组。顶部条和各空态共用一个。 */
-export const JobPicker = {
+/** 四个 AI 页面共用的显式岗位上下文。 */
+export const PageJobPicker = {
   setup() {
     const groups = computed(() => {
       const order = state.health.jobStatuses || [];
@@ -264,36 +289,30 @@ export const JobPicker = {
     return { groups, state, setCurrentJob };
   },
   template: `
-    <select class="jobpick" :value="state.currentJobId || ''"
-      @change="setCurrentJob($event.target.value || null)">
+    <label class="page-job-picker">
+      <span>本页岗位</span>
+      <select class="jobpick" :value="state.currentJobId || ''"
+        @change="setCurrentJob($event.target.value || null)">
       <option value="">（未选择岗位）</option>
       <optgroup v-for="group in groups" :key="group.status" :label="group.status">
         <option v-for="job in group.jobs" :key="job.recordId" :value="job.recordId">
-          {{ job.company }} · {{ job.position || '（待定岗位）' }}
+          {{ job.company }} · {{ job.position }}
         </option>
       </optgroup>
-    </select>`,
+      </select>
+    </label>`,
 };
 
-/** 四个岗位功能页共用的空态：没选岗位时给选择器，而不是渲染半个坏掉的表单。 */
+/** AI 页面共用的岗位/JD 空态，岗位选择器由页面单独常驻。 */
 export const NeedJob = {
   props: { what: { type: String, default: "这个功能" }, job: { type: Object, default: null } },
-  components: { JobPicker },
   template: `
-    <div v-if="job" class="empty">
-      <p class="etitle">{{ job.company }} 还没定岗位</p>
-      <p class="muted">这条现在只有公司和秋招网址。{{ what }}要拿具体岗位的 JD 来做，
-        没有 JD 生成出来的东西用不上，还白花一次调用。</p>
-      <p class="muted">去<a href="#/job/info">岗位信息</a>把岗位名和 JD 填上，这一页就自动可用。
-        这家公司开了多个岗位，也在那页「同公司再加一个岗位」。</p>
-      <JobPicker />
-    </div>
-    <div v-else class="empty">
-      <p class="etitle">先选一个岗位</p>
-      <p class="muted">{{ what }}要基于某个具体岗位的 JD 和简历来做。选定后它会一直跟着你，
-        换到别的功能页不用再选一次。</p>
-      <JobPicker />
-      <p class="muted">也可以去<a href="#/board">看板</a>里点一张卡片。</p>
+    <div class="empty">
+      <p v-if="job" class="etitle">请先填写 {{ job.company }} · {{ job.position }} 的 JD</p>
+      <p v-else class="etitle">请先选择本页岗位</p>
+      <p class="muted">{{ what }}只在岗位和 JD 完整时可用。</p>
+      <a v-if="job" class="ghost" href="#/job/info">编辑岗位</a>
+      <a v-else class="ghost" href="#/board">查看岗位看板</a>
     </div>`,
 };
 

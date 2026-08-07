@@ -11,11 +11,14 @@ export const state = reactive({
   authed: false,
   authRequired: true,
   health: {},
+  companies: [],
   jobs: [],
   resumes: [],
   experiences: [],
   tags: [],
   currentJobId: currentJob.load(),
+  currentCompanyId: null,
+  boardTab: "全部",
 
   loading: false,
   offline: false,
@@ -29,23 +32,26 @@ export const ACTIVE_STATUSES = computed(() => statuses.value.filter((s) => !isCl
 
 const CLOSED = new Set(["挂", "offer"]);
 export const isClosed = (status) => CLOSED.has(status);
+export const statusRequiresResume = (status) =>
+  (state.health.resumeRequiredStatuses || []).includes(status);
 
 export const currentJobRef = computed(
   () => state.jobs.find((job) => job.recordId === state.currentJobId) || null,
 );
 
-/**
- * 岗位名为空 = 只攒了公司和秋招网址，具体岗位还没找。这类记录不进六列看板，
- * 单独归到「待定公司」；填上岗位名它就自动转正。不额外占一个状态选项。
- */
-export const isPending = (job) => !String(job?.position || "").trim();
-export const pendingJobs = computed(() => state.jobs.filter(isPending));
-/** 四个 AI 功能页要的是「有具体岗位」，光有公司名喂不出有用的东西，白花一次调用。 */
-export const jobReady = computed(() => Boolean(currentJobRef.value) && !isPending(currentJobRef.value));
+export const jobReady = computed(() =>
+  Boolean(currentJobRef.value && String(currentJobRef.value.jd || "").trim()),
+);
 
 export function setCurrentJob(recordId) {
   state.currentJobId = recordId || null;
   currentJob.save(recordId);
+}
+
+export function openCompanyLibrary(recordId) {
+  state.currentCompanyId = recordId || null;
+  state.boardTab = "公司库";
+  location.hash = "#/board";
 }
 
 export function toast(message) {
@@ -99,6 +105,7 @@ export async function loadHealth() {
 export async function loadAll({ silent = false } = {}) {
   const cached = snapshot.load();
   if (cached && !state.jobs.length) {
+    state.companies = cached.companies || [];
     state.jobs = cached.jobs || [];
     state.resumes = cached.resumes || [];
     state.experiences = cached.experiences || [];
@@ -108,24 +115,46 @@ export async function loadAll({ silent = false } = {}) {
 
   if (!silent) state.loading = true;
   try {
-    const [jobs, resumes, experiences, tags] = await Promise.all([
+    const [companies, jobs, resumes, experiences, tags] = await Promise.all([
+      api.companies(),
       api.jobs(),
       api.resumes(),
       api.experiences(),
       api.tags(),
     ]);
+    state.companies = companies;
     state.jobs = jobs;
     state.resumes = resumes;
     state.experiences = experiences;
     state.tags = tags;
     state.offline = false;
     state.snapshotAt = Date.now();
-    snapshot.save({ jobs, resumes, experiences, tags });
+    snapshot.save({ companies, jobs, resumes, experiences, tags });
   } catch (error) {
     handleError(error);
   } finally {
     state.loading = false;
   }
+}
+
+export function mergeCompany(company) {
+  const index = state.companies.findIndex((item) => item.recordId === company.recordId);
+  if (index >= 0) state.companies[index] = { ...state.companies[index], ...company };
+  else state.companies.push(company);
+  state.jobs = state.jobs.map((job) => job.companyId === company.recordId ? {
+    ...job,
+    company: company.name,
+    siteUrl: company.siteUrl || "",
+    companyBackground: company.companyBackground || "",
+    companyNote: company.note || "",
+  } : job);
+  snapshot.save({
+    companies: state.companies,
+    jobs: state.jobs,
+    resumes: state.resumes,
+    experiences: state.experiences,
+    tags: state.tags,
+  });
 }
 
 /** 单条岗位改完后就地替换，不重拉整表。 */
@@ -134,6 +163,7 @@ export function mergeJob(job) {
   if (index >= 0) state.jobs[index] = { ...state.jobs[index], ...job };
   else state.jobs.push(job);
   snapshot.save({
+    companies: state.companies,
     jobs: state.jobs,
     resumes: state.resumes,
     experiences: state.experiences,
@@ -156,14 +186,13 @@ export function mergeExperience(experience) {
 export function dropJob(recordId) {
   state.jobs = state.jobs.filter((job) => job.recordId !== recordId);
   if (state.currentJobId === recordId) setCurrentJob(null);
-}
-
-/** 状态推进到下一档；已是最后一档或已结束则返回 null。 */
-export function nextStatus(status) {
-  const flow = ACTIVE_STATUSES.value;
-  const index = flow.indexOf(status);
-  if (index < 0 || index === flow.length - 1) return null;
-  return flow[index + 1];
+  snapshot.save({
+    companies: state.companies,
+    jobs: state.jobs,
+    resumes: state.resumes,
+    experiences: state.experiences,
+    tags: state.tags,
+  });
 }
 
 export const resumeCodes = computed(() =>

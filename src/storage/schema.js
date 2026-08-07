@@ -3,11 +3,22 @@ import { config } from "../config.js";
 // 代码里用英文 key，飞书表里是中文字段名。所有读写都经过这一层翻译。
 // type 是已实测的真实飞书字段类型，不是 PRD 里期望的类型（如 url 不被支持，实际是 text）。
 export const SCHEMAS = {
+  company: {
+    tableId: () => config.lark.tables.company,
+    primary: "name",
+    fields: {
+      name: { name: "公司名", type: "text" },
+      siteUrl: { name: "官网链接", type: "text" },
+      companyBackground: { name: "公司背景备注", type: "text" },
+      note: { name: "备注", type: "text" },
+    },
+  },
   main: {
     tableId: () => config.lark.tables.main,
     primary: "company",
     fields: {
       company: { name: "公司名", type: "text" },
+      companyId: { name: "公司ID", type: "text" },
       position: { name: "岗位名", type: "text" },
       jd: { name: "JD", type: "text" },
       siteUrl: { name: "官网链接", type: "text" },
@@ -54,6 +65,7 @@ export const SCHEMAS = {
 };
 
 export const JOB_STATUSES = ["待投", "已投", "笔试", "一面", "二面", "三面", "挂", "offer"];
+export const RESUME_REQUIRED_STATUSES = new Set(JOB_STATUSES.slice(1));
 
 // 多选字段写入不存在的选项会报 800030005，新增选项属于表结构变更（红线）
 export const EXPERIENCE_TAGS = [
@@ -137,6 +149,10 @@ export function fromRecord(tableKey, record) {
   const { fields } = SCHEMAS[tableKey];
   const raw = record.fields || {};
   const out = { recordId: record.record_id };
+  // 记录自带的创建时间，只有列表查询开了 automatic_fields 才返回。很多公司招满为止、
+  // 没有投递DDL，看板改用「加进来多久还没投」催办就靠这个，不用为它加一个字段。
+  // 单条写入的响应里没有这项，所以缺省时不写这个 key，让前端的浅合并保留原值。
+  if (record.created_time) out.createdAt = Number(record.created_time);
   for (const [key, field] of Object.entries(fields)) {
     out[key] = normalize(field, raw[field.name]);
   }

@@ -14,6 +14,7 @@ export const config = {
     // 内存假数据，仅供本地开发。VERCEL 由平台自动注入，所以线上不可能命中，哪怕后台误填 LARK_MOCK
     mock: process.env.LARK_MOCK === "1" && !process.env.VERCEL,
     tables: {
+      company: process.env.BITABLE_TABLE_COMPANY || "",
       main: process.env.BITABLE_TABLE_MAIN || "",
       experience: process.env.BITABLE_TABLE_EXPERIENCE || "",
       resume: process.env.BITABLE_TABLE_RESUME || "",
@@ -37,9 +38,6 @@ export function assertLarkConfig() {
   if (!config.lark.appId) missing.push("LARK_APP_ID");
   if (!config.lark.appSecret) missing.push("LARK_APP_SECRET");
   if (!config.lark.baseToken) missing.push("BITABLE_APP_TOKEN");
-  for (const [key, value] of Object.entries(config.lark.tables)) {
-    if (!value) missing.push(`BITABLE_TABLE_${key.toUpperCase()}`);
-  }
   if (missing.length) {
     throw new Error(`缺少环境变量：${missing.join(", ")}（见 .env.example）`);
   }

@@ -32,6 +32,8 @@ async function checkTable(tableKey) {
   return ok;
 }
 
+const allowMock = process.argv.includes("--allow-mock");
+
 console.log("— 环境 —");
 let allOk = true;
 const mark = (ok) => {
@@ -47,7 +49,7 @@ mark(line(Boolean(config.lark.userOpenId), "LARK_USER_OPEN_ID（准备文档授�
 mark(line(Boolean(config.auth.password), "APP_PASSWORD（公网部署必须设）"));
 
 if (isMock()) {
-  mark(line(false, "LLM：MOCK 模式，未配置可用 key"));
+  mark(line(allowMock, `LLM：MOCK 模式${allowMock ? "（本次允许）" : "，未配置可用 key"}`));
 } else {
   const ping = await chatCompletion({ messages: [{ role: "user", content: "hi" }] })
     .then(() => null)

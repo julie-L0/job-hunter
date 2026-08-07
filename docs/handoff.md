@@ -1,8 +1,8 @@
-# 交接文档 — 2026-08-06
+# 交接文档 — 2026-08-07
 
 ## 一句话现状
 
-后端框架 + 前端八个功能页都已写完，环境变量已补齐，`npm run check` 全 ✓（飞书三张表字段类型与 `schema.js` 一致、DeepSeek 连通）。**还没做的是浏览器里逐屏点一遍**，以及部署。
+公司库与结构化岗位创建已完成 mock 和真实数据验收。真实飞书现有 `company / main / experience / resume` 四张表；截至 2026-08-07 最新检查为 company 4 条公司、main 15 条岗位。本机 `.env` 已配置 company 表，当前代码已接管 3117 并通过真实浏览器验收；Vercel 尚未部署。
 
 架构约定、目录结构、飞书 ID、已踩过的坑都在 `CLAUDE.md`，产品需求在 `docs/PRD.md`，本文不重复。
 
@@ -14,7 +14,27 @@ LARK_MOCK=1 LLM_MOCK=1 APP_PASSWORD=x npm run dev
 
 用内存假数据 + 占位 AI，不碰真实飞书、不花 DeepSeek 的钱，口令输 `x`。要打真实数据就去掉两个 MOCK，口令用 `.env` 里的 `APP_PASSWORD`。
 
+真实公司库版本当前运行在 `http://localhost:3117`。迁移脚本默认只 dry-run；本次真实迁移已完成且二次 dry-run 为 0 变更。Vercel 部署仍需单独执行。
+
 ## 已经验证过的
+
+公司库版本（2026-08-07，全部使用 `LARK_MOCK=1 LLM_MOCK=1`）：
+
+- `npm run check -- --allow-mock` 通过：company 4 字段 13 条、main 16 字段 14 条、experience 7 字段 4 条、resume 6 字段 3 条
+- 公司增改查、规范化重名 409；岗位缺公司/岗位名/JD、无效状态/简历、已投无简历、PATCH 分步绕过均被服务端拒绝
+- 空 JD 的 AI 请求在模型调用前返回 400；公司改名后岗位 hydration 返回最新公司信息
+- 迁移分析 fixture、mock dry-run 和重复 `--apply` 通过；重复执行新增公司 0、回填岗位 0，且不删除伪公司记录
+- Chrome CDP 完成桌面和 `390x844` 主流程：新增/编辑公司、结构化创建岗位、创建后打开详情、状态/简历联动、四个 AI 页的“本页岗位”、刷新与离线旧快照
+- 移动端正文无横向溢出或控件重叠；删除岗位后公司保留，重新读取时岗位不复活
+
+真实公司迁移（2026-08-07）：
+
+- 迁移前 main 11 条岗位、3 个公司分组、0 个伪公司、0 个冲突；company 初始为空
+- 创建 company 四字段表，并给 main 新增“公司ID”文本字段；创表后 main 仍为 11 条且公司ID均为空
+- `--apply` 创建百度、京东、bilibili 3 条公司记录，只回填 11 条岗位的公司ID
+- 原始飞书记录逐条比较通过：除“公司ID”外，包括岗位名、JD、状态、附件、简历、DDL、备注在内的字段均未变化
+- 迁移后二次 dry-run 为 `companiesToCreate=0 / jobsToUpdate=0`，11 个引用全部有效
+- 当前代码在 3129 端口读取真实数据：公司岗位数 5 / 3 / 3，岗位详情和 AI 页岗位选择正常，控制台无错误
 
 框架层（早期）：
 
@@ -22,7 +42,7 @@ LARK_MOCK=1 LLM_MOCK=1 APP_PASSWORD=x npm run dev
 - 静态文件服务 + 目录穿越防护（`/../.env` 拿不到东西）；404 / 405 / 非法 JSON 都有明确报错
 - 飞书应用已被加为 base 协作者（`full_access`），写入权限实测通过
 
-前端这一版（脚本验证，不是靠肉眼）：
+旧三表版本前端（历史基线，脚本验证）：
 
 - **17 个模板全部用真实 Vue 3.5.41 编译器编译通过**，不会出现模板语法导致的白屏
 - **12 个 ES 模块 link 通过**（Node 会在 link 期校验 named export，拼错的 import 会当场报错）
@@ -53,7 +73,7 @@ LARK_MOCK=1 LLM_MOCK=1 APP_PASSWORD=x npm run dev
 - **权限已开**：应用 `cli_aa9fe5cc7ce49cd7` 的云文档权限 2026-08-06 生效，「把新建文档授权给你本人」这一步现在能过。界面上万一再失败会明说，并把 URL 留在页面上，不会让文档丢掉
 - **三个孤儿文件已授权给你**：`job-hunter 诊断-可删`、`测试公司-测试岗 面试准备`、bitable `小柳数据`。前两个是我诊断时建的，你可以直接删；**`小柳数据` 是另一个项目的，我只授权没动它**
 
-## 浏览器走查：56 项全过
+## 旧三表版本浏览器走查：56 项全过
 
 原来这份是留给你手点的 10 步清单。后来我用 Chrome DevTools Protocol 直接驱动浏览器跑完了（零依赖，Node 自带 `WebSocket` + Chrome 的 `--remote-debugging-port`），脚本在 `/tmp/walk-{a,b,c,d,e}.mjs`，截图在 `/tmp/jh-shots/`。**每一步都是真浏览器里真点的**，不是脚本层调接口。
 
@@ -86,11 +106,15 @@ LARK_MOCK=1 LLM_MOCK=1 APP_PASSWORD=x npm run dev
 | GET | /api/health | 公开，返回是否 mock / 是否需要口令 |
 | POST | /api/auth/check | 公开，校验口令 |
 | GET | /api/debug/fields/:tableKey | 查飞书真实字段类型，排查字段漂移 |
-| GET | /api/jobs | 主表全量 |
-| GET | /api/jobs/:recordId | 单个岗位 |
-| POST | /api/jobs | 新增，默认状态「待投」 |
-| PATCH | /api/jobs/:recordId | 改字段；碰到 status/resumeId 会自动重算投递记录 |
-| DELETE | /api/jobs/:recordId | 删除并重算投递记录 |
+| GET | /api/companies | 公司库全量 |
+| GET | /api/companies/:recordId | 单个公司 |
+| POST | /api/companies | 新增公司；名称按规范化结果拒绝重复 |
+| PATCH | /api/companies/:recordId | 编辑公司名、官网、背景与备注 |
+| GET | /api/jobs | hydrated 岗位全量；排除历史空岗位伪公司记录 |
+| GET | /api/jobs/:recordId | 单个 hydrated 岗位 |
+| POST | /api/jobs | 结构化新增；必须有 companyId、岗位名和 JD |
+| PATCH | /api/jobs/:recordId | 基于完整岗位校验状态/简历并重算投递记录 |
+| DELETE | /api/jobs/:recordId | 删除岗位并重算投递记录，不删除公司 |
 | POST | /api/jobs/:recordId/prep-doc | 建飞书准备文档 + 授权给本人 + 回填链接 |
 | GET | /api/resumes | 简历库 |
 | POST | /api/resumes/generate | AI 出简历草稿，不落库 |
@@ -116,6 +140,17 @@ LARK_MOCK=1 LLM_MOCK=1 APP_PASSWORD=x npm run dev
 统一返回 `{ok:true,data}` 或 `{ok:false,error,detail}`。除 health 和 auth/check 外都要 `X-Auth-Token` 请求头。
 
 ## 待办（按优先级）
+
+### P0 公司库真实迁移（已完成）
+
+- 真实表结构、公司记录和岗位 companyId 已迁移并核对
+- 本机 `.env` 已增加 `BITABLE_TABLE_COMPANY`
+- 没有历史空岗位伪公司记录需要处理
+
+### P0 剩余发布（仍是红线）
+
+- 本地 3117 已切换到公司库版本并完成真实验收
+- Vercel 尚未配置项目及 `BITABLE_TABLE_COMPANY`，也未部署公司库版本
 
 ### P1 剩下的真实飞书验证
 

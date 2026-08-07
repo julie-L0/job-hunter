@@ -2,7 +2,7 @@
 // 不写回 bitable（PRD F5 明确），整个会话存 localStorage：网申填一半被打断是常事。
 import { api } from "../api.js";
 import { currentJobRef, handleError, jobReady, state } from "../store.js";
-import { NeedJob, confirmDialog, copyText, useDraft } from "../ui.js";
+import { NeedJob, PageJobPicker, confirmDialog, copyText, useDraft } from "../ui.js";
 
 const { computed, reactive, ref } = window.Vue;
 
@@ -19,7 +19,7 @@ const newQuestion = (question = "", limit = null) => ({
 });
 
 export const Forms = {
-  components: { NeedJob },
+  components: { NeedJob, PageJobPicker },
   setup() {
     const job = currentJobRef;
     const error = ref("");
@@ -141,6 +141,7 @@ export const Forms = {
     };
   },
   template: `
+    <PageJobPicker />
     <NeedJob v-if="!jobReady" what="网申填表" :job="job" />
     <div v-else class="page">
       <h2 class="ptitle">网申填表 · {{ job.company }} {{ job.position }}</h2>

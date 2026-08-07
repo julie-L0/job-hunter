@@ -10,13 +10,20 @@ function recordsPath(tableKey, suffix = "") {
   return `/bitable/v1/apps/${config.lark.baseToken}/tables/${tableIdOf(tableKey)}/records${suffix}`;
 }
 
+function ensureCreatedAt(record, createdAt = Date.now()) {
+  return record.createdAt ? record : { ...record, createdAt };
+}
+
 export async function listRecords(tableKey, { viewId } = {}) {
   if (config.lark.mock) return mock.listRecords(tableKey);
   const items = [];
   let pageToken;
   do {
-    const { data } = await larkRequest("GET", recordsPath(tableKey), {
-      query: { page_size: PAGE_SIZE, page_token: pageToken, view_id: viewId },
+    // 用 search 而不是 GET 列表：只有 search 支持 automatic_fields，
+    // 才能读到记录自带的创建时间（看板的「躺了多久没投」靠它，不用加字段）
+    const { data } = await larkRequest("POST", recordsPath(tableKey, "/search"), {
+      query: { page_size: PAGE_SIZE, page_token: pageToken },
+      body: { view_id: viewId, automatic_fields: true },
     });
     for (const record of data.items || []) items.push(fromRecord(tableKey, record));
     pageToken = data.has_more ? data.page_token : undefined;
@@ -31,11 +38,11 @@ export async function getRecord(tableKey, recordId) {
 }
 
 export async function createRecord(tableKey, patch) {
-  if (config.lark.mock) return mock.createRecord(tableKey, patch);
+  if (config.lark.mock) return ensureCreatedAt(mock.createRecord(tableKey, patch));
   const { data } = await larkRequest("POST", recordsPath(tableKey), {
     body: { fields: toFields(tableKey, patch) },
   });
-  return fromRecord(tableKey, data.record);
+  return ensureCreatedAt(fromRecord(tableKey, data.record));
 }
 
 export async function updateRecord(tableKey, recordId, patch) {
@@ -53,14 +60,19 @@ export async function deleteRecord(tableKey, recordId) {
 }
 
 export async function batchCreateRecords(tableKey, patches) {
-  if (config.lark.mock) return mock.batchCreateRecords(tableKey, patches);
+  const createdAt = Date.now();
+  if (config.lark.mock) {
+    return mock.batchCreateRecords(tableKey, patches).map((record) => ensureCreatedAt(record, createdAt));
+  }
   const created = [];
   for (let i = 0; i < patches.length; i += BATCH_LIMIT) {
     const chunk = patches.slice(i, i + BATCH_LIMIT);
     const { data } = await larkRequest("POST", recordsPath(tableKey, "/batch_create"), {
       body: { records: chunk.map((patch) => ({ fields: toFields(tableKey, patch) })) },
     });
-    for (const record of data.records || []) created.push(fromRecord(tableKey, record));
+    for (const record of data.records || []) {
+      created.push(ensureCreatedAt(fromRecord(tableKey, record), createdAt));
+    }
   }
   return created;
 }

@@ -1,5 +1,6 @@
 import { HttpError } from "../http/app.js";
-import { getRecord, listRecords } from "../storage/bitable.js";
+import { listRecords } from "../storage/bitable.js";
+import { getJob } from "./companies.js";
 
 async function findResumeByCode(code) {
   const target = String(code || "").trim();
@@ -14,7 +15,8 @@ async function findResumeByCode(code) {
  * 不注入完整经历库：会稀释注意力且 token 随对话轮次翻倍增长。
  */
 export async function buildJobContext(recordId, { resumeCode } = {}) {
-  const job = await getRecord("main", recordId);
+  const job = await getJob(recordId);
+  if (!String(job.jd || "").trim()) throw new HttpError(400, "请先填写岗位 JD");
   const code = resumeCode || job.resumeId;
   const resume = code ? await findResumeByCode(code) : null;
   if (code && !resume) throw new HttpError(404, `简历库里没有编号 ${code}`);

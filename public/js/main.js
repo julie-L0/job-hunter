@@ -1,17 +1,8 @@
-// 应用外壳：登录闸门 → 侧边栏 + 顶部当前岗位条 + hash 路由。
+// 应用外壳：登录闸门 → 侧边栏 + hash 路由。
 // 各功能页在 views/ 里，一个侧边栏项对应一个文件。
 import { api, token } from "./api.js";
-import {
-  currentJobRef,
-  handleError,
-  loadAll,
-  loadHealth,
-  mergeJob,
-  nextStatus,
-  state,
-  toast,
-} from "./store.js";
-import { ConfirmHost, JobPicker, ddlLabel, isUrgent } from "./ui.js";
+import { loadAll, loadHealth, state } from "./store.js";
+import { ConfirmHost } from "./ui.js";
 import { Board } from "./views/board.js";
 import { JobInfo } from "./views/job-info.js";
 import { Forms } from "./views/forms.js";
@@ -95,60 +86,8 @@ const Gate = {
     </div>`,
 };
 
-const TopBar = {
-  components: { JobPicker },
-  setup() {
-    const picking = ref(false);
-    const advancing = ref(false);
-    const job = currentJobRef;
-    const upcoming = computed(() => (job.value ? nextStatus(job.value.status) : null));
-
-    async function advance() {
-      const target = upcoming.value;
-      if (!target || advancing.value) return;
-      advancing.value = true;
-      try {
-        const result = await api.patchJob(job.value.recordId, { status: target });
-        mergeJob(result.job);
-        toast(
-          result.recompute?.error
-            ? `状态已改为 ${target}，但简历投递记录重算失败：${result.recompute.error}`
-            : `已推进到 ${target}`,
-        );
-      } catch (failure) {
-        if (!handleError(failure)) toast(failure.message);
-      } finally {
-        advancing.value = false;
-      }
-    }
-    return { picking, advancing, job, upcoming, advance, state, ddlLabel, isUrgent };
-  },
-  template: `
-    <header class="topbar">
-      <template v-if="job">
-        <span class="dot" :class="'s-' + job.status"></span>
-        <button class="jobname" @click="picking = !picking">
-          {{ job.company }} · {{ job.position || '（待定岗位）' }} <span class="caret">▾</span>
-        </button>
-        <span class="pill">{{ job.status }}</span>
-        <span v-if="job.deadline" class="pill" :class="{ warn: isUrgent(job) }">{{ ddlLabel(job.deadline) }}</span>
-        <span v-if="job.resumeId" class="pill">{{ job.resumeId }}</span>
-        <span class="grow"></span>
-        <button v-if="upcoming" class="ghost" :disabled="state.offline || advancing"
-          @click="advance">推进 → {{ upcoming }}</button>
-        <a v-if="job.siteUrl" class="ghost" :href="job.siteUrl" target="_blank" rel="noreferrer">官网</a>
-        <a v-if="job.prepDocUrl" class="ghost" :href="job.prepDocUrl" target="_blank" rel="noreferrer">准备文档</a>
-      </template>
-      <template v-else>
-        <button class="jobname muted" @click="picking = !picking">未选择岗位 <span class="caret">▾</span></button>
-        <span class="grow"></span>
-      </template>
-      <div v-if="picking" class="pickpop" @click="picking = false"><JobPicker /></div>
-    </header>`,
-};
-
 const App = {
-  components: { Gate, TopBar, ConfirmHost },
+  components: { Gate, ConfirmHost },
   setup() {
     const view = computed(() => VIEWS[route.value]);
     const snapshotAge = computed(() => {
@@ -179,8 +118,6 @@ const App = {
       </aside>
 
       <main class="main">
-        <TopBar />
-
         <p v-if="state.configError" class="banner bad">
           {{ state.configError }} —— 补到 .env 里再重启 npm run dev。
         </p>

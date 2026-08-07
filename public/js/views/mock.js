@@ -3,7 +3,7 @@
 // 模型把标题写歪一个字 recordId 就是 null。AI 的输出不该当机器 key 用。
 import { api } from "../api.js";
 import { currentJobRef, handleError, jobReady, mergeExperience, state, toast } from "../store.js";
-import { NeedJob, confirmDialog, copyText, useDraft } from "../ui.js";
+import { NeedJob, PageJobPicker, confirmDialog, copyText, useDraft } from "../ui.js";
 
 const { computed, ref } = window.Vue;
 
@@ -30,7 +30,7 @@ function download(filename, text) {
 }
 
 export const Mock = {
-  components: { NeedJob },
+  components: { NeedJob, PageJobPicker },
   setup() {
     const job = currentJobRef;
     const busy = ref(false);
@@ -148,6 +148,7 @@ export const Mock = {
     };
   },
   template: `
+    <PageJobPicker />
     <NeedJob v-if="!jobReady" what="Mock 面试" :job="job" />
     <div v-else class="page">
       <h2 class="ptitle">Mock 面试 · {{ job.company }} {{ job.position }}</h2>

@@ -11,6 +11,7 @@
     "start": "node --env-file=.env src/dev-server.js",
     "check": "node --env-file=.env src/scripts/check.js",
     "init-tags": "node --env-file=.env src/scripts/init-tags.js",
-    "recompute": "node --env-file=.env src/scripts/recompute.js"
+    "recompute": "node --env-file=.env src/scripts/recompute.js",
+    "migrate-companies": "node --env-file=.env src/scripts/migrate-companies.js"
   }
 }
