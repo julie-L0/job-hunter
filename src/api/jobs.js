@@ -123,8 +123,11 @@ export const jobRoutes = [
       const patch = pickPatch(body);
       const company = await validateJob({ ...current, ...patch });
       const updated = await updateRecord("main", params.recordId, patch);
+      const persistedPatch = Object.fromEntries(
+        Object.keys(patch).map((key) => [key, updated[key]]),
+      );
       const warning = "status" in patch || "resumeId" in patch ? await recomputeWarning() : null;
-      return { job: hydrateJob(updated, company), warning };
+      return { job: hydrateJob({ ...current, ...persistedPatch }, company), warning };
     },
   },
   {
