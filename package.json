@@ -13,6 +13,7 @@
     "test": "node --test",
     "init-tags": "node --env-file-if-exists=.env src/scripts/init-tags.js",
     "recompute": "node --env-file-if-exists=.env src/scripts/recompute.js",
-    "migrate-companies": "node --env-file-if-exists=.env src/scripts/migrate-companies.js"
+    "migrate-companies": "node --env-file-if-exists=.env src/scripts/migrate-companies.js",
+    "migrate-experiences": "node --env-file-if-exists=.env src/scripts/migrate-experiences.js"
   }
 }

@@ -9,7 +9,7 @@ import { api } from "../api.js";
 import { FieldRow, ageLabel, ddlLabel, isStale, isUrgent } from "../ui.js";
 import { CompanyLibrary } from "./company-library.js";
 
-const { computed, ref, watch } = window.Vue;
+const { computed, nextTick, ref, watch } = window.Vue;
 
 const CLOSED_TAB = "已结束";
 const COMPANY_TAB = "公司库";
@@ -32,6 +32,13 @@ export const Board = {
     });
     const showClosed = ref(false);
     const editJd = ref(false);
+    const companyLibrary = ref(null);
+
+    async function beginJob() {
+      tab.value = COMPANY_TAB;
+      await nextTick();
+      companyLibrary.value?.beginJob();
+    }
 
     const inStatus = (status) => byUrgency(state.jobs.filter((job) => job.status === status));
     const tabs = computed(() => ["全部", COMPANY_TAB, ...ACTIVE_STATUSES.value, CLOSED_TAB]);
@@ -67,6 +74,8 @@ export const Board = {
       closed,
       closedSummary,
       showClosed,
+      companyLibrary,
+      beginJob,
       listed,
       detail,
       editJd,
@@ -85,6 +94,7 @@ export const Board = {
       <div class="board-summary">
         <span v-if="state.loading" class="muted">正在加载…</span>
         <span v-else class="muted">{{ state.companies.length }} 家公司 · {{ state.jobs.length }} 个岗位</span>
+        <button class="primary" :disabled="state.offline || !state.companies.length" @click="beginJob">新建岗位</button>
       </div>
 
       <nav class="tabs">
@@ -93,7 +103,7 @@ export const Board = {
         </button>
       </nav>
 
-      <CompanyLibrary v-if="tab === COMPANY_TAB" />
+      <CompanyLibrary v-if="tab === COMPANY_TAB" ref="companyLibrary" />
 
       <template v-else-if="tab === '全部'">
         <div class="cols">

@@ -1,32 +1,64 @@
 import { HttpError, requireBody } from "../http/app.js";
-import { batchCreateRecords, getRecord, listRecords, updateRecord } from "../storage/bitable.js";
-import { EXPERIENCE_TAGS } from "../storage/schema.js";
+import {
+  batchCreateRecords,
+  createRecord,
+  deleteRecord,
+  getRecord,
+  listFields,
+  listRecords,
+  updateRecord,
+} from "../storage/bitable.js";
 import { chatCompletion } from "../llm/provider.js";
 import { loadPrompt } from "../llm/prompts.js";
 
-// 多选写入不存在的选项会 800030005，新增选项属于表结构变更（红线），这里直接拒绝
-function checkTags(tags) {
-  if (!tags) return undefined;
-  const list = Array.isArray(tags) ? tags : [tags];
-  const unknown = list.filter((tag) => !EXPERIENCE_TAGS.includes(tag));
+const EXPERIENCE_FIELDS = ["title", "summary", "content", "links", "followups"];
+
+const cleanText = (value) => String(value ?? "").trim();
+
+export async function listExperienceTags() {
+  const fields = await listFields("experience");
+  const target = fields.find((field) => field.name === "技能标签");
+  if (!target) throw new HttpError(500, "飞书经历库缺少技能标签字段");
+  return Array.isArray(target.options) ? target.options.map(cleanText).filter(Boolean) : [];
+}
+
+export function validateExperienceTags(tags, allowedTags) {
+  if (tags === undefined) return undefined;
+  const values = Array.isArray(tags) ? tags : [tags];
+  const list = [...new Set(values.map(cleanText).filter(Boolean))];
+  const allowed = new Set(allowedTags);
+  const unknown = list.filter((tag) => !allowed.has(tag));
   if (unknown.length) {
-    throw new HttpError(400, `未定义的技能标签：${unknown.join("、")}。需先在飞书里加选项`);
+    throw new HttpError(400, `技能标签已不在飞书可选项中：${unknown.join("、")}。请刷新后重新选择`);
   }
   return list;
 }
 
-// 相关链接是一段多行文本，每行「说明 | URL」。导入时允许传数组，统一拼成同一种形状，
-// 免得同一个字段在库里出现两种格式
-function normalizeLinks(links) {
-  if (!links) return "";
-  if (typeof links === "string") return links;
-  const list = Array.isArray(links) ? links : [links];
-  return list
-    .map((item) =>
-      typeof item === "string" ? item : [item.label, item.url].filter(Boolean).join(" | "),
-    )
-    .filter(Boolean)
-    .join("\n");
+function normalizeItem(item, allowedTags, index) {
+  const title = cleanText(item?.title);
+  if (!title) throw new HttpError(400, `第 ${index + 1} 条缺少 title`);
+  return {
+    title,
+    summary: cleanText(item.summary),
+    tags: validateExperienceTags(item.tags || [], allowedTags),
+    content: cleanText(item.content),
+    links: cleanText(item.links),
+    followups: cleanText(item.followups),
+  };
+}
+
+export function appendInterviewQuestion(followups, { question, answerDirection, source, date }) {
+  const original = cleanText(followups);
+  const stamp = cleanText(date) || new Date().toISOString().slice(0, 10);
+  const label = [stamp, cleanText(source)].filter(Boolean).join(" · ");
+  const block = [
+    `### ${label}`,
+    "",
+    `Q：${cleanText(question)}`,
+    "",
+    `A：${cleanText(answerDirection)}`,
+  ].join("\n");
+  return [original, block].filter(Boolean).join("\n\n");
 }
 
 export const experienceRoutes = [
@@ -38,7 +70,15 @@ export const experienceRoutes = [
   {
     method: "GET",
     path: "/api/experiences/tags",
-    handler: () => EXPERIENCE_TAGS,
+    handler: () => listExperienceTags(),
+  },
+  {
+    method: "POST",
+    path: "/api/experiences",
+    handler: async ({ body }) => {
+      const tags = await listExperienceTags();
+      return createRecord("experience", normalizeItem(body, tags, 0));
+    },
   },
   {
     method: "POST",
@@ -46,36 +86,25 @@ export const experienceRoutes = [
     handler: async ({ body }) => {
       const items = body.items;
       if (!Array.isArray(items) || !items.length) throw new HttpError(400, "items 必须是非空数组");
-      const patches = items.map((item, i) => {
-        if (!item.title) throw new HttpError(400, `第 ${i + 1} 条缺少 title`);
-        return {
-          title: item.title,
-          star: item.star || "",
-          short50: item.short50 || "",
-          short100: item.short100 || "",
-          links: normalizeLinks(item.links),
-          tags: checkTags(item.tags),
-        };
-      });
-      return batchCreateRecords("experience", patches);
+      const tags = await listExperienceTags();
+      return batchCreateRecords(
+        "experience",
+        items.map((item, index) => normalizeItem(item, tags, index)),
+      );
     },
   },
   {
-    // 只出草稿，用户确认后走 PATCH 落库
     method: "POST",
-    path: "/api/experiences/generate-short",
+    path: "/api/experiences/generate-summary",
     handler: async ({ body }) => {
       requireBody(body, ["recordId"]);
       const experience = await getRecord("experience", body.recordId);
-      if (!experience.star) throw new HttpError(400, "该条经历没有 STAR 全文");
-      const prompt = await loadPrompt("experience-short", { full_text: experience.star });
+      const content = cleanText(body.content ?? experience.content);
+      if (!content) throw new HttpError(400, "该条经历没有正文");
+      const prompt = await loadPrompt("experience-summary", { content });
       const message = await chatCompletion({
         messages: [{ role: "user", content: prompt }],
-        // 占位内容也要照 prompt 约定的两段格式出，否则前端那套确定性拆分永远走不到
-        mockText: [
-          `【50字版】${experience.star.slice(0, 50)}（MOCK 占位）`,
-          `【100字版】${experience.star.slice(0, 100)}（MOCK 占位）`,
-        ].join("\n"),
+        mockText: `${content.slice(0, 120)}（MOCK 摘要草稿）`,
       });
       return { recordId: body.recordId, draft: message.content, mock: Boolean(message.mock) };
     },
@@ -85,26 +114,34 @@ export const experienceRoutes = [
     path: "/api/experiences/:recordId",
     handler: async ({ params, body }) => {
       const patch = {};
-      for (const key of ["title", "star", "short50", "short100"]) {
-        if (body[key] !== undefined) patch[key] = body[key];
+      for (const key of EXPERIENCE_FIELDS) {
+        if (body[key] !== undefined) patch[key] = cleanText(body[key]);
       }
-      if (body.links !== undefined) patch.links = normalizeLinks(body.links);
-      if (body.tags !== undefined) patch.tags = checkTags(body.tags);
+      if (body.tags !== undefined) {
+        patch.tags = validateExperienceTags(body.tags, await listExperienceTags());
+      }
       if (!Object.keys(patch).length) throw new HttpError(400, "没有可写字段");
+      if ("title" in patch && !patch.title) throw new HttpError(400, "经历标题不能为空");
       return updateRecord("experience", params.recordId, patch);
     },
   },
   {
-    // 追问记录只追加不覆盖，目标经历由用户在前端确认后传进来
+    method: "DELETE",
+    path: "/api/experiences/:recordId",
+    handler: ({ params }) => deleteRecord("experience", params.recordId),
+  },
+  {
     method: "POST",
-    path: "/api/experiences/:recordId/followup",
+    path: "/api/experiences/:recordId/interview-question",
     handler: async ({ params, body }) => {
-      requireBody(body, ["note"]);
+      requireBody(body, ["question"]);
       const experience = await getRecord("experience", params.recordId);
-      const stamp = new Date().toISOString().slice(0, 10);
-      const entry = `【${stamp}${body.source ? ` ${body.source}` : ""}】${body.note}`;
-      const next = [experience.followups, entry].filter(Boolean).join("\n");
-      return updateRecord("experience", params.recordId, { followups: next });
+      const followups = appendInterviewQuestion(experience.followups, {
+        question: body.question,
+        answerDirection: body.answerDirection,
+        source: body.source,
+      });
+      return updateRecord("experience", params.recordId, { followups });
     },
   },
 ];

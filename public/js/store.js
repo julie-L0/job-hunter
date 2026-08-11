@@ -183,6 +183,17 @@ export function mergeExperience(experience) {
   else state.experiences.push(experience);
 }
 
+export function dropExperience(recordId) {
+  state.experiences = state.experiences.filter((experience) => experience.recordId !== recordId);
+  snapshot.save({
+    companies: state.companies,
+    jobs: state.jobs,
+    resumes: state.resumes,
+    experiences: state.experiences,
+    tags: state.tags,
+  });
+}
+
 export function dropJob(recordId) {
   state.jobs = state.jobs.filter((job) => job.recordId !== recordId);
   if (state.currentJobId === recordId) setCurrentJob(null);

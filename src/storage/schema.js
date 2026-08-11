@@ -41,10 +41,9 @@ export const SCHEMAS = {
     primary: "title",
     fields: {
       title: { name: "经历标题", type: "text" },
-      star: { name: "STAR全文", type: "text" },
-      short50: { name: "50字版", type: "text" },
-      short100: { name: "100字版", type: "text" },
+      summary: { name: "经历摘要", type: "text" },
       tags: { name: "技能标签", type: "multiselect" },
+      content: { name: "经历正文", type: "text" },
       links: { name: "相关链接", type: "text" },
       followups: { name: "追问记录", type: "text" },
     },
