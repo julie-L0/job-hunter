@@ -9,7 +9,7 @@ function sleep(ms) {
 }
 
 // 没有可用 key 时也要能把整条链路跑通，否则前端和路由无法联调。
-// `mockText` 给那些前端要按格式解析返回的场景（如短版本的【50字版】/【100字版】）：
+// `mockText` 给那些前端要按固定文本使用返回的场景（如经历摘要草稿）：
 // 占位文本不照 prompt 约定的形状出，解析分支就永远走不到，只能花钱验。
 function mockCompletion(messages, mockText) {
   if (mockText) return { role: "assistant", content: mockText, mock: true };

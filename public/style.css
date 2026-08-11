@@ -307,6 +307,8 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .tagpick label.on { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
 .tagpick label:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tagpick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.tag-invalid { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; color: var(--warn); font-size: 12px; }
+.tag-invalid button { padding: 3px 7px; color: var(--warn); background: var(--warn-soft); border: 1px solid var(--warn-line); border-radius: 4px; cursor: pointer; }
 /* ---- 表格（简历库 / 经历库 / 导入预览） ---- */
 
 .grid {
@@ -334,6 +336,25 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .newbox { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); }
 .newbox h3 { font-size: 15px; margin: 0 0 6px; }
 .newbox textarea { margin-top: 10px; }
+.experience-create { margin: 0 0 22px; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.experience-create > summary { width: max-content; color: var(--accent); font-weight: 600; cursor: pointer; }
+.experience-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; margin-top: 16px; }
+.experience-form > label,
+.experience-form > div { min-width: 0; }
+.experience-form .wide { grid-column: 1 / -1; }
+.experience-form .link { margin-left: 8px; }
+.experience-content { min-height: 360px; margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; line-height: 1.65; }
+.experience-grid { table-layout: fixed; }
+.experience-grid th:first-child { width: 22%; }
+.experience-grid th:nth-child(2) { width: 42%; }
+.experience-grid th:nth-child(3) { width: 28%; }
+.experience-grid th:last-child { width: 8%; }
+.experience-summary-cell { color: var(--text); line-height: 1.55; overflow-wrap: anywhere; }
+.experience-actions { display: flex; justify-content: space-between; gap: 10px; }
+.summary-draft { padding-top: 14px; border-top: 1px solid var(--line); }
+.summary-draft .pill { display: block; width: max-content; margin-bottom: 8px; }
+.summary-draft button { margin-top: 8px; }
+.experience-empty { padding: 18px 0; }
 
 .danger-zone { margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--line); }
 
@@ -443,26 +464,9 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .qans { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 
 /* ---- 经历库 ---- */
-
-.shortbox {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin: 12px 0;
-  padding: 12px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-}
-.shortbox .pill { align-self: flex-start; }
-
-.fups { margin-top: 14px; font-size: 13px; }
-.fups summary { color: var(--dim); cursor: pointer; }
-.fups article { margin-top: 8px; padding: 4px 0 4px 10px; border-left: 2px solid var(--line); }
-.fups p { margin: 4px 0 0; white-space: pre-wrap; line-height: 1.75; }
 /* ---- 公司库与显式岗位上下文 ---- */
 
-.board-summary { min-height: 24px; display: flex; justify-content: flex-end; align-items: center; }
+.board-summary { min-height: 24px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
 .company-create {
   display: grid;
   grid-template-columns: minmax(160px, 0.7fr) minmax(220px, 1.3fr) auto minmax(0, 1fr);
@@ -543,6 +547,129 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 }
 .page-job-picker .jobpick { width: min(420px, 100%); max-width: none; }
 
+/* ---- 岗位比较 ---- */
+
+.comparison-page { max-width: 1280px; }
+.comparison-head { margin-bottom: 18px; }
+.comparison-head p { margin: 3px 0 0; }
+.comparison-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.comparison-picker { padding: 18px 22px 18px 0; border-right: 1px solid var(--line); }
+.comparison-criteria { padding: 18px 0 18px 22px; }
+.comparison-section-head,
+.comparison-results-head,
+.comparison-detail > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.comparison-section-head { min-height: 52px; }
+.comparison-section-head h3,
+.comparison-results-head h3,
+.comparison-detail h3 { margin: 0; font-size: 15px; }
+.comparison-section-head p,
+.comparison-results-head p { margin: 2px 0 0; }
+.comparison-filters { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 8px; margin: 12px 0; }
+.comparison-company-list { max-height: 520px; overflow-y: auto; border-top: 1px solid var(--line); }
+.comparison-company { border-bottom: 1px solid var(--line); padding: 12px 0; }
+.comparison-company > header { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.comparison-company > header strong { font-size: 14px; }
+.comparison-job {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 5px 8px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.comparison-job:hover { background: var(--panel); }
+.comparison-job.selected { background: var(--accent-soft); border-left-color: var(--accent); }
+.comparison-job-name { min-width: 0; overflow-wrap: anywhere; }
+.comparison-empty { padding: 18px 0; }
+.comparison-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 12px 0; }
+.comparison-presets button {
+  font: inherit;
+  min-height: 36px;
+  padding: 6px 9px;
+  color: var(--dim);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-right: 0;
+  cursor: pointer;
+}
+.comparison-presets button:first-child { border-radius: 6px 0 0 6px; }
+.comparison-presets button:last-child { border-right: 1px solid var(--line); border-radius: 0 6px 6px 0; }
+.comparison-presets button.on { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-line); }
+.comparison-presets button.on + button { border-left-color: var(--accent-line); }
+.comparison-criteria textarea { min-height: 180px; }
+.comparison-criterion-meta { display: flex; align-items: center; gap: 8px; min-height: 28px; margin-top: 4px; font-size: 12px; }
+.comparison-submit { width: 100%; justify-content: center; min-height: 38px; margin-top: 8px; }
+.comparison-results { margin-top: 28px; }
+.comparison-results-head { margin-bottom: 14px; }
+.comparison-results-head > div:first-child { min-width: 0; }
+.comparison-results-head .pill { margin-left: auto; }
+.comparison-contrasts { display: grid; gap: 0; margin: 14px 0 18px; border-top: 1px solid var(--line); }
+.comparison-contrasts > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.25fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.comparison-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+.comparison-table { width: 100%; min-width: 1320px; border-collapse: collapse; background: var(--card); }
+.comparison-table th,
+.comparison-table td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.comparison-table th { font-size: 12px; color: var(--dim); background: var(--panel); font-weight: 500; }
+.comparison-table tbody tr:last-child td { border-bottom: 0; }
+.comparison-table td:first-child { min-width: 150px; }
+.comparison-table td:nth-child(2) { min-width: 76px; }
+.comparison-table td:nth-child(3),
+.comparison-table td:nth-child(4) { min-width: 180px; }
+.comparison-table td:nth-child(5) { min-width: 200px; }
+.comparison-table td:nth-child(6),
+.comparison-table td:nth-child(7) { min-width: 210px; }
+.comparison-table td:first-child span,
+.comparison-table td small { display: block; margin-top: 3px; color: var(--dim); line-height: 1.5; }
+.comparison-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 26px;
+  border-radius: 5px;
+  font-weight: 700;
+  background: #efefec;
+}
+.comparison-score.high { color: var(--accent); background: var(--accent-soft); }
+.comparison-score.mid { color: #765d1d; background: #f7f2df; }
+.comparison-score.low { color: var(--warn); background: var(--warn-soft); }
+.comparison-score.overall { width: 42px; height: 32px; font-size: 16px; }
+.comparison-detail { padding: 22px 0; border-bottom: 1px solid var(--line); }
+.comparison-detail > header { align-items: center; margin-bottom: 14px; }
+.comparison-detail > header .muted { font-size: 12px; }
+.comparison-detail-meta { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+.comparison-detail-meta small { color: var(--dim); }
+.comparison-detail-meta .pill { margin-left: 5px; }
+.comparison-technical-summary { display: flex; align-items: center; gap: 8px; }
+.comparison-technical-summary span { color: var(--warn); font-size: 12px; }
+.comparison-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 30px; }
+.comparison-detail-grid section { min-width: 0; }
+.comparison-detail-grid h4 { margin: 0 0 6px; font-size: 13px; }
+.comparison-detail-grid p { margin: 0 0 8px; }
+.comparison-detail-grid ul { margin: 0; padding-left: 18px; }
+.comparison-detail-grid li { margin: 5px 0; }
+.comparison-detail-grid li strong,
+.comparison-detail-grid li span,
+.comparison-detail-grid li small { display: block; }
+.comparison-detail-grid li small { color: var(--dim); }
+
 /* ---- 窄屏兜底。桌面优先，这里只保证「能用」，不做专门的移动端交互 ---- */
 
 @media (max-width: 900px) {
@@ -571,7 +698,7 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   .banner { padding: 10px 14px; }
   .content { padding: 14px; }
 
-  .cols, .quick, .fields, .company-layout, .company-form { grid-template-columns: minmax(0, 1fr); }
+  .cols, .quick, .fields, .company-layout, .company-form, .experience-form { grid-template-columns: minmax(0, 1fr); }
   .company-create { grid-template-columns: minmax(0, 1fr); }
   .company-list { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
   .company-card { flex: 0 0 220px; }
@@ -583,6 +710,13 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   .page-job-picker .jobpick { width: 100%; }
   .bubble.user { align-self: stretch; }
   .furow select { flex: 1 1 100%; }
+
+  .comparison-workspace { grid-template-columns: minmax(0, 1fr); }
+  .comparison-picker { padding: 16px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .comparison-criteria { padding: 16px 0; }
+  .comparison-company-list { max-height: 420px; }
+  .comparison-detail-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .comparison-contrasts > div { grid-template-columns: minmax(0, 1fr); gap: 3px; }
 
   /* 表格转卡片：一行一张，展开的编辑行紧跟其后 */
   .grid { border: 0; background: none; }

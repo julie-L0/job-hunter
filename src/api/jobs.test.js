@@ -10,11 +10,25 @@ function jsonResponse(payload) {
   });
 }
 
-test("patching a job keeps its company when Lark returns only updated fields", async () => {
+test("selecting a resume keeps the job company when Lark returns only updated fields", async () => {
   const originalFetch = globalThis.fetch;
   const originalLark = {
     ...config.lark,
     tables: { ...config.lark.tables },
+  };
+  const jobRecord = {
+    record_id: "job-1",
+    fields: {
+      "公司名": "旧公司名",
+      "公司ID": "company-1",
+      "岗位名": "产品经理",
+      JD: "岗位描述",
+      "状态": "待投",
+    },
+  };
+  const resumeRecord = {
+    record_id: "resume-1",
+    fields: { "编号": "R1", "投递记录": "" },
   };
 
   Object.assign(config.lark, {
@@ -27,6 +41,7 @@ test("patching a job keeps its company when Lark returns only updated fields", a
   Object.assign(config.lark.tables, {
     company: "company-table",
     main: "main-table",
+    resume: "resume-table",
   });
 
   globalThis.fetch = async (url, options = {}) => {
@@ -35,21 +50,10 @@ test("patching a job keeps its company when Lark returns only updated fields", a
       return jsonResponse({ code: 0, tenant_access_token: "token", expire: 7200 });
     }
     if (pathname.endsWith("/tables/main-table/records/job-1") && options.method === "GET") {
-      return jsonResponse({
-        code: 0,
-        data: {
-          record: {
-            record_id: "job-1",
-            fields: {
-              "公司名": "旧公司名",
-              "公司ID": "company-1",
-              "岗位名": "产品经理",
-              JD: "岗位描述",
-              "状态": "待投",
-            },
-          },
-        },
-      });
+      return jsonResponse({ code: 0, data: { record: jobRecord } });
+    }
+    if (pathname.endsWith("/tables/resume-table/records/search") && options.method === "POST") {
+      return jsonResponse({ code: 0, data: { items: [resumeRecord], has_more: false } });
     }
     if (pathname.endsWith("/tables/company-table/records/company-1")) {
       return jsonResponse({
@@ -68,8 +72,20 @@ test("patching a job keeps its company when Lark returns only updated fields", a
         data: {
           record: {
             record_id: "job-1",
-            fields: { "备注": "跟进一面" },
+            fields: { "简历编号": "R1" },
           },
+        },
+      });
+    }
+    if (pathname.endsWith("/tables/main-table/records/search") && options.method === "POST") {
+      return jsonResponse({
+        code: 0,
+        data: {
+          items: [{
+            ...jobRecord,
+            fields: { ...jobRecord.fields, "简历编号": "R1" },
+          }],
+          has_more: false,
         },
       });
     }
@@ -82,14 +98,15 @@ test("patching a job keeps its company when Lark returns only updated fields", a
     );
     const result = await route.handler({
       params: { recordId: "job-1" },
-      body: { note: "跟进一面" },
+      body: { resumeId: "R1" },
     });
 
     assert.equal(result.job.recordId, "job-1");
     assert.equal(result.job.companyId, "company-1");
     assert.equal(result.job.company, "示例公司");
     assert.equal(result.job.position, "产品经理");
-    assert.equal(result.job.note, "跟进一面");
+    assert.equal(result.job.resumeId, "R1");
+    assert.equal(result.warning, null);
   } finally {
     globalThis.fetch = originalFetch;
     Object.assign(config.lark, originalLark);

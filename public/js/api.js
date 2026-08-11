@@ -91,12 +91,16 @@ export const api = {
 
   experiences: () => request("GET", "/api/experiences"),
   tags: () => request("GET", "/api/experiences/tags"),
+  createExperience: (item) => request("POST", "/api/experiences", item),
   importExperiences: (items) => request("POST", "/api/experiences/import", { items }),
-  generateShort: (recordId) => request("POST", "/api/experiences/generate-short", { recordId }),
+  generateExperienceSummary: (recordId, content) =>
+    request("POST", "/api/experiences/generate-summary", { recordId, content }),
   patchExperience: (recordId, patch) => request("PATCH", `/api/experiences/${recordId}`, patch),
-  followup: (recordId, note, source) =>
-    request("POST", `/api/experiences/${recordId}/followup`, { note, source }),
+  deleteExperience: (recordId) => request("DELETE", `/api/experiences/${recordId}`),
+  addInterviewQuestion: (recordId, payload) =>
+    request("POST", `/api/experiences/${recordId}/interview-question`, payload),
 
+  compareJobs: (payload) => request("POST", "/api/job-comparison", payload),
   splitForm: (rawText) => request("POST", "/api/fill-form/split", { rawText }),
   answerForm: (payload) => request("POST", "/api/fill-form/answer", payload),
   reviseForm: (payload) => request("POST", "/api/fill-form/revise", payload),

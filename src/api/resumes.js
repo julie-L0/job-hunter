@@ -22,7 +22,13 @@ export const resumeRoutes = [
       const prompt = await loadPrompt("resume-generate", {
         jd: body.jd,
         experiences: experiences
-          .map((exp) => `## ${exp.title}\n${exp.star || exp.short100 || ""}`)
+          .filter((experience) => experience.title && (experience.summary || experience.content))
+          .map((experience) => [
+            `## ${experience.title}`,
+            `能力标签：${(experience.tags || []).join("、") || "未标注"}`,
+            `经历摘要：${experience.summary || "未填写"}`,
+            `经历正文：\n${experience.content || "未填写"}`,
+          ].join("\n"))
           .join("\n\n"),
       });
       const message = await chatCompletion({ messages: [{ role: "user", content: prompt }] });

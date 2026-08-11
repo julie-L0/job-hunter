@@ -226,21 +226,35 @@ export const TagPicker = {
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
+    const invalidTags = computed(() => (props.modelValue || []).filter(
+      (tag) => !props.options.includes(tag),
+    ));
     const toggle = (tag) => {
-      const current = props.modelValue || [];
+      const current = (props.modelValue || []).filter((item) => props.options.includes(item));
       emit(
         "update:modelValue",
         current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag],
       );
     };
-    return { toggle };
+    const removeInvalid = (tag) => emit(
+      "update:modelValue",
+      (props.modelValue || []).filter((item) => item !== tag && props.options.includes(item)),
+    );
+    return { invalidTags, toggle, removeInvalid };
   },
   template: `
-    <div class="tagpick">
-      <label v-for="tag in options" :key="tag" :class="{ on: (modelValue || []).includes(tag) }">
-        <input type="checkbox" :disabled="disabled"
-          :checked="(modelValue || []).includes(tag)" @change="toggle(tag)">{{ tag }}
-      </label>
+    <div>
+      <div class="tagpick">
+        <label v-for="tag in options" :key="tag" :class="{ on: (modelValue || []).includes(tag) }">
+          <input type="checkbox" :disabled="disabled"
+            :checked="(modelValue || []).includes(tag)" @change="toggle(tag)">{{ tag }}
+        </label>
+      </div>
+      <div v-if="invalidTags.length" class="tag-invalid">
+        <span>飞书中已不可用：</span>
+        <button v-for="tag in invalidTags" :key="tag" type="button" :disabled="disabled"
+          @click="removeInvalid(tag)">{{ tag }} ×</button>
+      </div>
     </div>`,
 };
 

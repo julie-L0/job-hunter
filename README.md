@@ -7,7 +7,7 @@
 - 公司库：长期维护公司信息，并在同一公司下创建多个岗位
 - 岗位看板：按投递状态管理岗位、DDL、JD 和使用的简历版本
 - 简历库：保存不同方向的简历内容，并自动维护投递记录
-- 经历库：管理 STAR 经历、精简版本、技能标签和追问记录
+- 经历库：管理标题、摘要、技能标签、Markdown 正文、相关链接和追问记录
 - 申请表助手：从网页文本中拆分问题并逐题生成草稿
 - 面试准备：结合公司、JD 和简历生成准备材料
 - 自我介绍：生成 1 分钟、3 分钟、5 分钟和英文版本
@@ -108,6 +108,7 @@ npm start                    # 启动本地服务
 npm test                     # 运行测试
 npm run check                # 检查环境和飞书表结构
 npm run migrate-companies    # 旧数据迁移 dry-run
+npm run migrate-experiences  # 经历库旧字段迁移 dry-run
 ```
 
-`migrate-companies` 默认只分析，不写入；只有显式增加 `--apply` 才会修改飞书数据。执行真实迁移前应先备份并核对 dry-run 输出。
+`migrate-companies` 默认只分析，不写入；只有显式增加 `--apply` 才会修改飞书数据。`migrate-experiences` 默认也是 dry-run，只有显式增加 `-- --yes` 才会创建缺失字段并迁移旧「STAR全文」「50字版」「100字版」。执行真实迁移前应先备份并核对 dry-run 输出。

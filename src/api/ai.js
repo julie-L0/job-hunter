@@ -3,6 +3,12 @@ import { listRecords } from "../storage/bitable.js";
 import { chatCompletion, chatJson } from "../llm/provider.js";
 import { loadPrompt } from "../llm/prompts.js";
 import { buildJobContext } from "../services/context.js";
+import { listJobs } from "../services/companies.js";
+import {
+  buildComparisonContext,
+  mockComparisonResult,
+  normalizeComparisonResult,
+} from "../services/job-comparison.js";
 import { appendDocText } from "../services/prep-doc.js";
 
 const INTRO_VARIANTS = {
@@ -25,7 +31,46 @@ function transcript(history) {
     .join("\n\n");
 }
 
+function experienceLibrary(experiences) {
+  return experiences
+    .filter((experience) => experience.title && (experience.summary || experience.content))
+    .map((experience) => [
+      `## ${experience.title}`,
+      `能力标签：${(experience.tags || []).join("、") || "未标注"}`,
+      `经历摘要：${experience.summary || "未填写"}`,
+      `经历正文：\n${experience.content || "未填写"}`,
+    ].join("\n"))
+    .join("\n\n");
+}
+
 export const aiRoutes = [
+  {
+    method: "POST",
+    path: "/api/job-comparison",
+    handler: async ({ body }) => {
+      const [jobs, experiences] = await Promise.all([listJobs(), listRecords("experience")]);
+      const context = buildComparisonContext({
+        recordIds: body.recordIds,
+        criterion: body.criterion,
+        jobs,
+        experiences,
+      });
+      const prompt = await loadPrompt("job-comparison", {
+        criterion: context.criterion,
+        jobs_json: JSON.stringify(context.promptJobs, null, 2),
+        experiences_json: JSON.stringify(context.promptExperiences, null, 2),
+      });
+      const raw = await chatJson({
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.2,
+        mockShape: mockComparisonResult(context.selectedJobs, context.promptExperiences),
+      });
+      return {
+        ...normalizeComparisonResult(raw, context.selectedJobs),
+        mock: Boolean(raw.mock),
+      };
+    },
+  },
   {
     // 第一步：把网页复制来的原始文本拆成题目，交给用户确认后再逐题生成
     method: "POST",
@@ -50,10 +95,15 @@ export const aiRoutes = [
     path: "/api/fill-form/answer",
     handler: async ({ body }) => {
       requireBody(body, ["recordId", "question"]);
-      const { vars } = await buildJobContext(body.recordId, { resumeCode: body.resumeCode });
+      const [{ vars }, experiences] = await Promise.all([
+        buildJobContext(body.recordId, { resumeCode: body.resumeCode }),
+        listRecords("experience"),
+      ]);
       const prompt = await loadPrompt("fill-form", {
         limit: body.limit || "",
+        jd: vars.jd,
         resume_content: vars.resume_content,
+        experiences: experienceLibrary(experiences),
         question: body.question,
       });
       const history = [{ role: "user", content: prompt }];
@@ -168,8 +218,16 @@ export const aiRoutes = [
         mockShape: {
           summary: "【MOCK 复盘】答得比较稳的是项目背景，追问深度上还可以再补细节。",
           followups: [
-            { experience_title: experiences[0]?.title ?? "", note: "补一句量化结果（MOCK）" },
-            { experience_title: "一条标题故意写歪的建议", note: "这条匹配不上，应该让你手选（MOCK）" },
+            {
+              experience_title: experiences[0]?.title ?? "",
+              question: "这个结果具体是怎样量化的？（MOCK）",
+              answer_direction: "补充指标口径、基线和最终结果。（MOCK）",
+            },
+            {
+              experience_title: "一条标题故意写歪的建议",
+              question: "方案中最大的取舍是什么？（MOCK）",
+              answer_direction: "说明备选方案、约束和最终选择依据。（MOCK）",
+            },
           ],
         },
       });

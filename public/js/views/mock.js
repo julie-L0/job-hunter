@@ -93,7 +93,8 @@ export const Mock = {
         session.summary = result.summary;
         session.followups = (result.followups || []).map((item) => ({
           title: item.experience_title || "",
-          note: item.note || "",
+          question: item.question || "",
+          answerDirection: item.answer_direction || "",
           chosen: item.recordId || matchExperience(item.experience_title),
           written: false,
         }));
@@ -107,7 +108,11 @@ export const Mock = {
 
     async function writeFollowup(item) {
       try {
-        const record = await api.followup(item.chosen, item.note, `Mock 面试 ${job.value.company}`);
+        const record = await api.addInterviewQuestion(item.chosen, {
+          question: item.question || item.note,
+          answerDirection: item.answerDirection,
+          source: `Mock 面试 ${job.value.company}`,
+        });
         mergeExperience(record);
         item.written = true;
         toast("已写入追问记录");
@@ -135,7 +140,7 @@ export const Mock = {
     async function reset() {
       const ok = await confirmDialog({
         title: "清空这次 Mock 记录？",
-        body: "对话、标记和复盘摘要都会从浏览器里删掉。已经写进经历库的追问记录不受影响。",
+        body: "对话、标记和复盘摘要都会从浏览器里删掉。已经写进追问记录的面试问题不受影响。",
         danger: true,
       });
       if (ok) clear();
@@ -211,7 +216,8 @@ export const Mock = {
           <h3>追问建议</h3>
           <p v-if="!session.followups.length" class="muted">这次没有产生追问建议。</p>
           <article v-for="(item, i) in session.followups" :key="i" class="fu">
-            <p class="futext">{{ item.note }}</p>
+            <p class="futext"><strong>Q：</strong>{{ item.question || item.note }}</p>
+            <p class="muted"><strong>回答方向：</strong>{{ item.answerDirection || '待补充' }}</p>
             <div class="furow">
               <span class="flabel">写进哪条经历</span>
               <select v-model="item.chosen" :disabled="state.offline || item.written">

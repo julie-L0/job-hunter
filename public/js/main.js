@@ -4,6 +4,7 @@ import { api, token } from "./api.js";
 import { loadAll, loadHealth, state } from "./store.js";
 import { ConfirmHost } from "./ui.js";
 import { Board } from "./views/board.js";
+import { JobComparison } from "./views/job-comparison.js";
 import { JobInfo } from "./views/job-info.js";
 import { Forms } from "./views/forms.js";
 import { Intro } from "./views/intro.js";
@@ -15,7 +16,7 @@ import { Experiences } from "./views/experiences.js";
 const { createApp, computed, ref } = window.Vue;
 
 const NAV = [
-  { group: "", items: [["#/board", "看板"]] },
+  { group: "", items: [["#/board", "看板"], ["#/compare", "岗位比较"]] },
   {
     group: "当前岗位",
     items: [
@@ -37,6 +38,7 @@ const NAV = [
 
 const VIEWS = {
   "#/board": Board,
+  "#/compare": JobComparison,
   "#/job/info": JobInfo,
   "#/job/forms": Forms,
   "#/job/intro": Intro,
