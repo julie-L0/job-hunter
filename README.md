@@ -8,6 +8,7 @@
 - 岗位看板：按投递状态管理岗位、DDL、JD 和使用的简历版本
 - 简历库：保存不同方向的简历内容，并自动维护投递记录
 - 经历库：管理标题、摘要、技能标签、Markdown 正文、相关链接和追问记录
+- 岗位比较偏好：同步阶段策略和价值取向，支持求职价值/练手价值/兜底价值三轴比较
 - 申请表助手：从网页文本中拆分问题并逐题生成草稿
 - 面试准备：结合公司、JD 和简历生成准备材料
 - 自我介绍：生成 1 分钟、3 分钟、5 分钟和英文版本
@@ -55,18 +56,19 @@ npm test
 ## 连接自己的飞书数据
 
 1. 创建飞书企业自建应用，并开通 Bitable、Docx 和 Drive 所需权限。
-2. 创建一个飞书多维表格，准备 `company`、`main`、`experience`、`resume` 四张表。
+2. 创建一个飞书多维表格，准备 `company`、`main`、`experience`、`resume` 四张表；偏好表可由迁移脚本创建。
 3. 将飞书应用添加为该多维表格的协作者。
-4. 以 `.env.example` 为模板创建本地 `.env`，填写自己的应用凭证、Base token 和四张表的 table ID。
-5. 运行检查，确认字段名和字段类型与代码契约一致。
-6. 启动本地服务。
+4. 以 `.env.example` 为模板创建本地 `.env`，填写自己的应用凭证、Base token 和已有表的 table ID。
+5. 运行 `npm run migrate-preferences -- --yes --write-env` 创建偏好设置表并写入 `BITABLE_TABLE_PREFERENCE`。
+6. 运行检查，确认字段名和字段类型与代码契约一致。
+7. 启动本地服务。
 
 ```bash
 npm run check
 npm start
 ```
 
-四张表的字段清单、准备文档授权方式和旧数据迁移流程见 [安装与运维说明](docs/handoff.md)。产品行为与数据约束见 [PRD](docs/PRD.md)。
+字段清单、准备文档授权方式和旧数据迁移流程见 [安装与运维说明](docs/handoff.md)。产品行为与数据约束见 [PRD](docs/PRD.md)。
 
 ## 数据与写入规则
 
@@ -109,6 +111,7 @@ npm test                     # 运行测试
 npm run check                # 检查环境和飞书表结构
 npm run migrate-companies    # 旧数据迁移 dry-run
 npm run migrate-experiences  # 经历库旧字段迁移 dry-run
+npm run migrate-preferences  # 偏好设置表 dry-run
 ```
 
-`migrate-companies` 默认只分析，不写入；只有显式增加 `--apply` 才会修改飞书数据。`migrate-experiences` 默认也是 dry-run，只有显式增加 `-- --yes` 才会创建缺失字段并迁移旧「STAR全文」「50字版」「100字版」。执行真实迁移前应先备份并核对 dry-run 输出。
+`migrate-companies` 默认只分析，不写入；只有显式增加 `--apply` 才会修改飞书数据。`migrate-experiences` 默认也是 dry-run，只有显式增加 `-- --yes` 才会创建缺失字段并迁移旧「STAR全文」「50字版」「100字版」。`migrate-preferences` 真实执行使用 `-- --yes --write-env`，会创建「偏好设置」表、写入默认偏好，并把 table ID 写进本地 `.env`。执行真实迁移前应先备份并核对 dry-run 输出。

@@ -2,7 +2,16 @@
 // 走同一套 toFields / fromRecord，所以 schema 映射和序列化逻辑照样被这条路径验证到。
 // 只在进程内存里，重启即清空，永远不碰真实飞书。
 import { LarkError } from "./lark-client.js";
-import { EXPERIENCE_TAGS, JOB_STATUSES, SCHEMAS, fromRecord, toFields } from "./schema.js";
+import {
+  COMPARISON_STAGES,
+  EXPERIENCE_TAGS,
+  EXPERIENCE_TYPES,
+  JOB_STAR_VALUE,
+  JOB_STATUSES,
+  SCHEMAS,
+  fromRecord,
+  toFields,
+} from "./schema.js";
 
 // schema.js 的类型名 → 飞书字段类型枚举，check.js 靠这个比对
 const TYPE_CODES = { text: 1, number: 2, select: 3, multiselect: 4, datetime: 5 };
@@ -90,7 +99,12 @@ export function listFields(tableKey) {
     name: field.name,
     type: TYPE_CODES[field.type] || 1,
     options:
-      field.type === "select" ? [...JOB_STATUSES] : field.type === "multiselect" ? [...EXPERIENCE_TAGS] : null,
+      field.name === "状态" ? [...JOB_STATUSES]
+        : field.name === "星标" ? [JOB_STAR_VALUE]
+        : field.name === "阶段策略" ? [...COMPARISON_STAGES]
+        : field.name === "经历类型" ? [...EXPERIENCE_TYPES]
+          : field.type === "multiselect" ? [...EXPERIENCE_TAGS]
+            : null,
   }));
 }
 
@@ -145,6 +159,7 @@ const SEED_RESUMES = [
 const SEED_EXPERIENCES = [
   {
     title: "校园二手书小程序从 0 到 1",
+    type: "项目经历",
     content: "## Overview\n学校每年毕业季有大量教材被当废纸卖掉，学弟学妹又在各个群里零散求书。我想做一个能自动匹配供需的轻量工具，目标是一个学期内跑到 3000 注册。\n\n## What I Did\n- 在 6 个院系群做了 40 份问卷确认真实需求。\n- 用小程序模板搭出最小版本，只做发书、找书、站内联系三个功能。\n- 毕业季前在宿舍楼下摆了两周收书点解决冷启动供给。\n\n## Key Challenges\n冷启动阶段最大问题是供给不足，所以先用线下收书点保证第一批可交易商品。\n\n## Reflection\n一个学期累计注册 4200 人，成交 1800 单，次月留存 38%，现在由下一届学生会接手运营。\n\n## Possible Interview Questions\nQ：为什么没有一开始就做担保交易？\n\nA：说明资源约束和先验证供需匹配的取舍。",
     summary: "毕业季教材被当废纸卖、学弟学妹又在群里零散求书，我做了个小程序把供需自动匹配起来。先用 40 份问卷确认需求，只做发书、找书、站内联系三个功能保证能快速上线，冷启动阶段在宿舍楼下摆了两周收书点解决供给不足。一学期注册 4200 人、成交 1800 单，次月留存 38%，现已交接给下一届继续运营。",
     tags: ["产品设计", "项目管理"],
@@ -153,6 +168,7 @@ const SEED_EXPERIENCES = [
   },
   {
     title: "AI 简历润色工具的用户调研",
+    type: "项目经历",
     content: "## Overview\n团队做的简历润色工具上线两个月，日活卡在 200 上不去，但没人知道用户到底卡在哪。\n\n## What I Did\n- 拉了近 30 天的漏斗数据，定位到 62% 的用户在上传简历步骤流失。\n- 约了 23 位用户访谈，发现核心顾虑是简历隐私信息会不会被存下来。\n- 推动上线本地解析、不落库的说明和开关。\n\n## Key Challenges\n用户不是不需要润色，而是不信任上传链路；改文案前必须先把真实顾虑讲清楚。\n\n## Reflection\n上传完成率从 38% 提到 71%，日活两周内翻到 480。\n\n## Possible Interview Questions\nQ：你怎么判断隐私顾虑比功能效果更关键？\n\nA：结合漏斗数据和访谈原话说明判断依据。",
     tags: ["用户研究", "AI应用"],
     links: "访谈提纲 | https://example.com/resume-ai-research",
@@ -160,6 +176,7 @@ const SEED_EXPERIENCES = [
   },
   {
     title: "社区话题运营带来 30% 互动增长",
+    type: "实习经历",
     content: "## Overview\n负责的垂类社区周互动量连续三周下滑，运营手段还是靠人工挑帖子推首页。\n\n## What I Did\n- 把过去半年 200 个话题按参与门槛和情绪强度两个维度打标。\n- 发现低门槛加高共鸣的话题互动量是平均值的 2.4 倍。\n- 据此重做选题清单，并搭了一个每日看板跟踪效果。\n\n## Key Challenges\n不能只靠爆款直觉，需要把选题变成能复用、能交接的方法。\n\n## Reflection\n连续四周互动量回升，最高单话题带来 30% 互动增长，选题方法被写进组内 SOP。\n\n## Possible Interview Questions\nQ：话题打标是否存在主观偏差？\n\nA：说明打标规则、复核方式和后续看板验证。",
     summary: "负责的垂类社区周互动量连续三周下滑，运营还靠人工挑帖。我把过去半年 200 个话题按参与门槛和情绪强度两个维度打标，发现低门槛加高共鸣的话题互动是平均值的 2.4 倍，据此重做选题清单并搭了每日看板跟踪。连续四周互动量回升，单话题最高带来 30% 互动增长，方法被写进组内 SOP。",
     tags: ["内容运营", "数据分析"],
@@ -168,6 +185,7 @@ const SEED_EXPERIENCES = [
   },
   {
     title: "跨部门推动结算流程自动化",
+    type: "实习经历",
     content: "## Overview\n创作者激励金每月靠运营手工核对 Excel 再发财务，一轮要 3 天且常出错。\n\n## What I Did\n- 主动提出把结算流程产品化，目标是把人工环节压到半天以内。\n- 把运营、财务、研发三方的口径差异列成一张表。\n- 发现争议集中在跨月发布内容归属，组织三方对齐规则后推动研发排期。\n- 上线自动核算和差异清单。\n\n## Key Challenges\n难点不是计算公式，而是三方对同一笔内容收益的归属口径不一致。\n\n## Reflection\n单轮结算从 3 天压到 2 小时，错误率从每月平均 5 笔降到 0，运营同学不再需要碰 Excel。\n\n## Possible Interview Questions\nQ：如果财务和运营对规则仍然不一致，你会怎么推进？\n\nA：说明争议记录、决策人确认和灰度验证机制。",
     summary: "创作者激励金原本靠运营手工核对 Excel，一轮要 3 天且常出错。我梳理运营、财务、研发三方口径，定位到跨月发布内容归属争议，组织对齐规则后推动自动核算和差异清单上线。单轮结算压到 2 小时，错误率从每月平均 5 笔降到 0。",
     tags: ["跨团队协作", "商业分析"],

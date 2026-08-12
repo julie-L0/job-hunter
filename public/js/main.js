@@ -115,7 +115,7 @@ const App = {
         <span class="grow"></span>
         <div class="sfoot">
           <span v-if="state.health.larkMock" class="pill warn">飞书假数据</span>
-          <span v-if="state.health.llmMock" class="pill warn">AI MOCK</span>
+          <span v-if="state.health.llmMock" class="pill warn" title="LLM_MOCK=1 或未配置 DEEPSEEK_API_KEY，AI 结果为占位内容">AI占位</span>
         </div>
       </aside>
 

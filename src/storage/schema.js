@@ -25,6 +25,7 @@ export const SCHEMAS = {
       deadline: { name: "投递DDL", type: "datetime" },
       referralCode: { name: "内推码", type: "text" },
       status: { name: "状态", type: "select" },
+      starred: { name: "星标", type: "select" },
       resumeId: { name: "简历编号", type: "text" },
       prepDocUrl: { name: "准备文档链接", type: "text" },
       intro1min: { name: "自我介绍-1min", type: "text" },
@@ -41,6 +42,7 @@ export const SCHEMAS = {
     primary: "title",
     fields: {
       title: { name: "经历标题", type: "text" },
+      type: { name: "经历类型", type: "select" },
       summary: { name: "经历摘要", type: "text" },
       tags: { name: "技能标签", type: "multiselect" },
       content: { name: "经历正文", type: "text" },
@@ -61,10 +63,27 @@ export const SCHEMAS = {
       createdAt: { name: "创建时间", type: "datetime" },
     },
   },
+
+  preference: {
+    tableId: () => config.lark.tables.preference,
+    primary: "configName",
+    fields: {
+      configName: { name: "配置名", type: "text" },
+      stage: { name: "阶段策略", type: "select" },
+      careerWeight: { name: "求职价值权重", type: "number" },
+      practiceWeight: { name: "练手价值权重", type: "number" },
+      fallbackWeight: { name: "兜底价值权重", type: "number" },
+      valueOrientation: { name: "价值取向", type: "text" },
+      updatedAt: { name: "更新时间", type: "datetime" },
+    },
+  },
 };
 
 export const JOB_STATUSES = ["待投", "已投", "笔试", "一面", "二面", "三面", "挂", "offer"];
+export const JOB_STAR_VALUE = "星标";
 export const RESUME_REQUIRED_STATUSES = new Set(JOB_STATUSES.slice(1));
+export const EXPERIENCE_TYPES = ["实习经历", "项目经历", "校园经历", "荣誉/获奖", "语言/证书", "其他"];
+export const COMPARISON_STAGES = ["练手", "均衡", "冲刺", "兜底"];
 
 // 多选字段写入不存在的选项会报 800030005，新增选项属于表结构变更（红线）
 export const EXPERIENCE_TAGS = [
@@ -98,6 +117,12 @@ function serialize(field, value) {
   switch (field.type) {
     case "datetime":
       return empty ? null : toMillis(value);
+    case "number": {
+      if (empty) return null;
+      const number = Number(value);
+      if (!Number.isFinite(number)) throw new Error(`无法解析数字：${value}`);
+      return number;
+    }
     case "multiselect":
       return empty ? [] : (Array.isArray(value) ? value : [value]).map(String).filter(Boolean);
     case "select":
@@ -119,6 +144,10 @@ function normalize(field, raw) {
   }
   if (typeof raw === "object" && "text" in raw) return String(raw.text);
   if (field.type === "multiselect") return [String(raw)];
+  if (field.type === "number") {
+    const number = Number(raw);
+    return Number.isFinite(number) ? number : null;
+  }
   return raw;
 }
 

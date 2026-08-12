@@ -1,5 +1,5 @@
 import { api } from "../api.js";
-import { dropExperience, handleError, loadAll, mergeExperience, state, toast } from "../store.js";
+import { dropExperience, experienceTypes, handleError, loadAll, mergeExperience, state, toast } from "../store.js";
 import { TagPicker, confirmDialog, useDraft } from "../ui.js";
 
 const { computed, reactive, ref } = window.Vue;
@@ -8,6 +8,9 @@ const HEADER_KEYS = {
   经历标题: "title",
   标题: "title",
   title: "title",
+  经历类型: "type",
+  类型: "type",
+  type: "type",
   经历摘要: "summary",
   摘要: "summary",
   summary: "summary",
@@ -167,6 +170,7 @@ function normalizeItem(raw) {
   const followups = Array.isArray(item.followups) ? item.followups.join("\n") : item.followups;
   return {
     title: String(item.title || "").trim(),
+    type: String(item.type || "").trim(),
     summary: String(item.summary || "").trim(),
     tags: tags.map((tag) => String(tag).trim()).filter(Boolean),
     content: String(content || "").trim(),
@@ -176,7 +180,7 @@ function normalizeItem(raw) {
 }
 
 function blankExperience() {
-  return { title: "", summary: "", tags: [], content: "", links: "", followups: "" };
+  return { title: "", type: "", summary: "", tags: [], content: "", links: "", followups: "" };
 }
 
 export const Experiences = {
@@ -215,6 +219,12 @@ export const Experiences = {
         .filter((tag) => !allowed.has(tag));
     });
 
+    const badTypes = computed(() => {
+      const allowed = new Set(experienceTypes.value);
+      return [...new Set(parsed.value.items.map((item) => item.type).filter(Boolean))]
+        .filter((type) => !allowed.has(type));
+    });
+
     function beginEdit(row) {
       if (open.value === row.recordId) {
         open.value = "";
@@ -222,6 +232,7 @@ export const Experiences = {
       }
       edits[row.recordId] = {
         title: row.title || "",
+        type: row.type || "",
         summary: row.summary || "",
         tags: [...(row.tags || [])],
         content: row.content || "",
@@ -316,7 +327,7 @@ export const Experiences = {
 
     async function runImport() {
       const items = parsed.value.items;
-      if (!items.length || badTags.value.length || importing.value) return;
+      if (!items.length || badTags.value.length || badTypes.value.length || importing.value) return;
       const ok = await confirmDialog({
         title: `将写入 ${items.length} 条经历？`,
         body: "会直接新建记录，同名不会自动合并，请先确认没有重复条目。",
@@ -342,6 +353,7 @@ export const Experiences = {
 
     return {
       state,
+      experienceTypes,
       open,
       error,
       importing,
@@ -355,6 +367,7 @@ export const Experiences = {
       bulk,
       parsed,
       badTags,
+      badTypes,
       rows: computed(() => state.experiences),
       beginEdit,
       saveEdit,
@@ -372,7 +385,7 @@ export const Experiences = {
       <header class="pagehead">
         <div>
           <h2 class="ptitle">经历库</h2>
-          <p class="muted">每条记录是一段完整经历；摘要用于快速匹配，正文保留完整 Markdown 上下文。</p>
+          <p class="muted">每条记录是一段完整经历；类型决定网申填表归档，摘要用于经历类字段复制，正文保留完整上下文。</p>
         </div>
       </header>
 
@@ -382,6 +395,10 @@ export const Experiences = {
         <summary>新建经历</summary>
         <div class="experience-form">
           <label><span class="flabel">经历标题</span><input v-model="fresh.title" :disabled="state.offline" /></label>
+          <label><span class="flabel">经历类型</span><select v-model="fresh.type" :disabled="state.offline">
+            <option value="">待确认</option>
+            <option v-for="type in experienceTypes" :key="type" :value="type">{{ type }}</option>
+          </select></label>
           <label class="wide"><span class="flabel">经历摘要</span><textarea rows="4" v-model="fresh.summary" :disabled="state.offline"></textarea></label>
           <div class="wide"><span class="flabel">技能标签</span><TagPicker v-model="fresh.tags" :options="state.tags" :disabled="state.offline" /></div>
           <label class="wide"><span class="flabel">相关链接</span><textarea rows="3" v-model="fresh.links" :disabled="state.offline" placeholder="材料名称 | https://..."></textarea></label>
@@ -396,18 +413,23 @@ export const Experiences = {
       </details>
 
       <table v-if="rows.length" class="grid experience-grid">
-        <thead><tr><th>经历标题</th><th>经历摘要</th><th>技能标签</th><th></th></tr></thead>
+        <thead><tr><th>经历标题</th><th>经历类型</th><th>经历摘要</th><th>技能标签</th><th></th></tr></thead>
         <tbody v-for="row in rows" :key="row.recordId">
           <tr :class="{ on: open === row.recordId }">
             <td><strong>{{ row.title }}</strong></td>
+            <td><span :class="row.type ? 'pill' : 'pill warn'">{{ row.type || '待确认' }}</span></td>
             <td class="experience-summary-cell">{{ row.summary || '—' }}</td>
             <td class="muted">{{ (row.tags || []).join('、') || '—' }}</td>
             <td><button class="link" @click="beginEdit(row)">{{ open === row.recordId ? '收起' : '编辑' }}</button></td>
           </tr>
           <tr v-if="open === row.recordId" class="editrow">
-            <td colspan="4">
+            <td colspan="5">
               <div class="experience-form">
                 <label><span class="flabel">经历标题</span><input v-model="edits[row.recordId].title" :disabled="state.offline" /></label>
+                <label><span class="flabel">经历类型</span><select v-model="edits[row.recordId].type" :disabled="state.offline || saving[row.recordId]">
+                  <option value="">待确认</option>
+                  <option v-for="type in experienceTypes" :key="type" :value="type">{{ type }}</option>
+                </select></label>
                 <label class="wide"><span class="flabel">经历摘要</span><textarea rows="4" v-model="edits[row.recordId].summary" :disabled="state.offline"></textarea></label>
                 <div class="wide"><span class="flabel">技能标签</span><TagPicker v-model="edits[row.recordId].tags" :options="state.tags" :disabled="state.offline || saving[row.recordId]" /></div>
                 <label class="wide"><span class="flabel">相关链接</span><textarea rows="3" v-model="edits[row.recordId].links" :disabled="state.offline"></textarea></label>
@@ -437,13 +459,14 @@ export const Experiences = {
 
       <section class="newbox">
         <h3>批量导入</h3>
-        <p class="muted">粘贴 JSON 数组或 CSV。字段为经历标题、经历摘要、技能标签、经历正文、相关链接、追问记录；JSON 英文字段为 title、summary、tags、content、links、followups。标签必须来自飞书当前可选项，同名不会自动合并。</p>
-        <textarea rows="12" v-model="bulk.text" :disabled="state.offline" placeholder='[{"title":"项目名称","summary":"职责与结果摘要","tags":["产品设计"],"content":"## Overview\\n\\n……","links":"材料 | https://...","followups":"Q：后续可追问的问题"}]'></textarea>
+        <p class="muted">粘贴 JSON 数组或 CSV。字段为经历标题、经历类型、经历摘要、技能标签、经历正文、相关链接、追问记录；JSON 英文字段为 title、type、summary、tags、content、links、followups。标签和类型必须来自飞书当前可选项，同名不会自动合并。</p>
+        <textarea rows="12" v-model="bulk.text" :disabled="state.offline" placeholder='[{"title":"项目名称","type":"项目经历","summary":"职责与结果摘要","tags":["产品设计"],"content":"## Overview\\n\\n……","links":"材料 | https://...","followups":"Q：后续可追问的问题"}]'></textarea>
         <p v-if="parsed.error" class="bad">{{ parsed.error }}</p>
         <p v-if="badTags.length" class="bad">飞书中没有这些标签：{{ badTags.join('、') }}</p>
+        <p v-if="badTypes.length" class="bad">不支持这些经历类型：{{ badTypes.join('、') }}</p>
         <p v-if="parsed.items.length && !parsed.error" class="muted">已识别 {{ parsed.items.length }} 条经历。</p>
         <div class="actions">
-          <button class="primary" :disabled="state.offline || importing || !parsed.items.length || badTags.length" @click="runImport">{{ importing ? '导入中…' : '确认导入' }}</button>
+          <button class="primary" :disabled="state.offline || importing || !parsed.items.length || badTags.length || badTypes.length" @click="runImport">{{ importing ? '导入中…' : '确认导入' }}</button>
           <button :disabled="!bulk.text" @click="clearBulk">清空</button>
         </div>
       </section>

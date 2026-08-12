@@ -10,8 +10,9 @@ import {
 } from "../storage/bitable.js";
 import { chatCompletion } from "../llm/provider.js";
 import { loadPrompt } from "../llm/prompts.js";
+import { EXPERIENCE_TYPES } from "../storage/schema.js";
 
-const EXPERIENCE_FIELDS = ["title", "summary", "content", "links", "followups"];
+const EXPERIENCE_FIELDS = ["title", "type", "summary", "content", "links", "followups"];
 
 const cleanText = (value) => String(value ?? "").trim();
 
@@ -34,11 +35,22 @@ export function validateExperienceTags(tags, allowedTags) {
   return list;
 }
 
+export function validateExperienceType(type) {
+  if (type === undefined) return undefined;
+  const value = cleanText(Array.isArray(type) ? type[0] : type);
+  if (!value) return "";
+  if (!EXPERIENCE_TYPES.includes(value)) {
+    throw new HttpError(400, `经历类型必须是：${EXPERIENCE_TYPES.join("/")}`);
+  }
+  return value;
+}
+
 function normalizeItem(item, allowedTags, index) {
   const title = cleanText(item?.title);
   if (!title) throw new HttpError(400, `第 ${index + 1} 条缺少 title`);
   return {
     title,
+    type: validateExperienceType(item.type) || "",
     summary: cleanText(item.summary),
     tags: validateExperienceTags(item.tags || [], allowedTags),
     content: cleanText(item.content),
@@ -117,6 +129,7 @@ export const experienceRoutes = [
       for (const key of EXPERIENCE_FIELDS) {
         if (body[key] !== undefined) patch[key] = cleanText(body[key]);
       }
+      if (body.type !== undefined) patch.type = validateExperienceType(body.type);
       if (body.tags !== undefined) {
         patch.tags = validateExperienceTags(body.tags, await listExperienceTags());
       }

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   appendInterviewQuestion,
+  validateExperienceType,
   validateExperienceTags,
 } from "./experiences.js";
 import {
@@ -18,6 +19,12 @@ test("experience tags use the supplied Feishu options", () => {
     () => validateExperienceTags(["组织协调", "数据分析"], ["数据分析"]),
     /组织协调/,
   );
+});
+
+test("experience type uses the schema enum", () => {
+  assert.equal(validateExperienceType("项目经历"), "项目经历");
+  assert.equal(validateExperienceType(""), "");
+  assert.throws(() => validateExperienceType("产品经理"), /经历类型必须是/);
 });
 
 test("interview questions are appended to followup records", () => {

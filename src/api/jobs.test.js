@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { config } from "../config.js";
 import { jobRoutes } from "./jobs.js";
+import { JOB_STAR_VALUE, fromRecord, toFields } from "../storage/schema.js";
 
 function jsonResponse(payload) {
   return new Response(JSON.stringify(payload), {
@@ -9,6 +10,15 @@ function jsonResponse(payload) {
     headers: { "Content-Type": "application/json" },
   });
 }
+
+test("job star field serializes as a nullable select", () => {
+  assert.deepEqual(toFields("main", { starred: JOB_STAR_VALUE }), { "星标": JOB_STAR_VALUE });
+  assert.deepEqual(toFields("main", { starred: "" }), { "星标": null });
+  assert.equal(
+    fromRecord("main", { record_id: "job-star", fields: { "星标": [JOB_STAR_VALUE] } }).starred,
+    JOB_STAR_VALUE,
+  );
+});
 
 test("selecting a resume keeps the job company when Lark returns only updated fields", async () => {
   const originalFetch = globalThis.fetch;

@@ -94,6 +94,79 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 }
 .pill.warn { border-color: var(--warn-line); background: var(--warn-soft); color: var(--warn); }
 .pill.ok { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
+.info-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #efefec;
+  color: var(--dim);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+}
+.info-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  width: min(280px, 72vw);
+  padding: 8px 10px;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line-on);
+  border-radius: 6px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.info-tip:hover::after, .info-tip:focus::after { opacity: 1; transform: translate(-50%, 0); }
+.star-button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #b4ada4;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.star-button:hover:not(:disabled), .star-button.on {
+  color: #765b19;
+  background: #fbf5df;
+  border-color: #ead9a5;
+}
+.star-button:disabled { opacity: 0.42; cursor: not-allowed; }
+.star-button.compact { width: 24px; height: 24px; font-size: 15px; }
+.star-button-label {
+  width: auto;
+  min-height: 30px;
+  padding: 5px 10px;
+  color: var(--dim);
+  background: var(--card);
+  border-color: var(--line);
+  font-size: 13px;
+}
+.star-button-label.on { color: #765b19; background: #fbf5df; border-color: #ead9a5; }
 /* 状态只在这一个 8px 圆点上着色 */
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; display: inline-block; }
 .s-待投 { background: #c98a2e; }
@@ -345,9 +418,10 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .experience-form .link { margin-left: 8px; }
 .experience-content { min-height: 360px; margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; line-height: 1.65; }
 .experience-grid { table-layout: fixed; }
-.experience-grid th:first-child { width: 22%; }
-.experience-grid th:nth-child(2) { width: 42%; }
-.experience-grid th:nth-child(3) { width: 28%; }
+.experience-grid th:first-child { width: 20%; }
+.experience-grid th:nth-child(2) { width: 12%; }
+.experience-grid th:nth-child(3) { width: 38%; }
+.experience-grid th:nth-child(4) { width: 22%; }
 .experience-grid th:last-child { width: 8%; }
 .experience-summary-cell { color: var(--text); line-height: 1.55; overflow-wrap: anywhere; }
 .experience-actions { display: flex; justify-content: space-between; gap: 10px; }
@@ -380,6 +454,10 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .col article:hover, .qlist article:hover { border-color: var(--line-on); }
 .col article.on, .qlist article.on { border-left-color: var(--accent); background: var(--accent-soft); }
 .col article.urgent, .qlist article.urgent { border-left-color: var(--warn); }
+.col article.starred, .qlist article.starred { border-top-color: #ead9a5; }
+.job-card-head { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.job-card-head strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.job-card-head .star-button { margin: -4px -4px 0 0; flex: none; }
 .col strong, .qlist strong, .closedlist strong { font-size: 14px; }
 .pos { font-size: 12px; color: var(--dim); }
 .col small, .qlist small, .closedlist small { font-size: 12px; color: var(--dim); }
@@ -397,6 +475,7 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   cursor: pointer;
 }
 .closedlist article.on { border-color: var(--accent-line); background: var(--accent-soft); }
+.closedlist article.starred { border-color: #ead9a5; }
 
 /* ---- 看板：单状态速查（左列表 + 右 JD 铺开） ---- */
 
@@ -463,6 +542,56 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .limit { width: 72px; flex: none; }
 .qans { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 
+.form-section {
+  margin: 10px 0;
+  padding: 0 12px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.form-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.form-section > summary small { color: var(--dim); font-weight: 400; }
+.form-section .dhead { margin: 2px 0 10px; }
+.form-section .dhead p { margin: 0; }
+.fill-entry {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--panel);
+}
+.fill-entry .qhead { align-items: baseline; flex-wrap: wrap; }
+.fill-entry strong { overflow-wrap: anywhere; }
+.fill-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.fill-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.fill-field.wide { grid-column: 1 / -1; }
+.fill-field > span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 20px;
+}
+.fill-field b { font-size: 12px; color: var(--dim); font-weight: 500; }
+.fill-field .link { font-size: 12px; }
+.fill-field.missing input,
+.fill-field.missing textarea { border-color: var(--warn-line); background: var(--warn-soft); }
+
 /* ---- 经历库 ---- */
 /* ---- 公司库与显式岗位上下文 ---- */
 
@@ -520,7 +649,7 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   width: 100%;
   min-height: 44px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
@@ -529,8 +658,10 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r);
+  cursor: pointer;
 }
 .company-job:hover { border-color: var(--accent-line); }
+.company-job.starred { border-color: #ead9a5; }
 .company-job strong { overflow-wrap: anywhere; }
 .company-job small { color: var(--dim); white-space: nowrap; }
 .company-context { margin: 14px 0; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -607,13 +738,57 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .comparison-presets button:last-child { border-right: 1px solid var(--line); border-radius: 0 6px 6px 0; }
 .comparison-presets button.on { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-line); }
 .comparison-presets button.on + button { border-left-color: var(--accent-line); }
+.comparison-preference-box {
+  padding: 12px;
+  margin: 12px 0 18px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.comparison-label-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.comparison-label-row strong { font-size: 13px; }
+.comparison-stage-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; }
+.comparison-stage-buttons button {
+  font: inherit;
+  min-height: 34px;
+  padding: 5px 8px;
+  color: var(--dim);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-right: 0;
+  cursor: pointer;
+}
+.comparison-stage-buttons button:first-child { border-radius: 6px 0 0 6px; }
+.comparison-stage-buttons button:last-child { border-right: 1px solid var(--line); border-radius: 0 6px 6px 0; }
+.comparison-stage-buttons button.on { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-line); }
+.comparison-stage-buttons button.on + button { border-left-color: var(--accent-line); }
+.comparison-preference-field { display: flex; flex-direction: column; gap: 5px; }
+.comparison-preference-field > span { color: var(--dim); font-size: 12px; }
+.comparison-preference-field textarea { min-height: 130px; }
+.comparison-section-head.compact { min-height: auto; margin-top: 8px; }
 .comparison-criteria textarea { min-height: 180px; }
+.comparison-criteria .comparison-preference-field textarea { min-height: 130px; }
+.comparison-criteria > textarea { min-height: 120px; }
 .comparison-criterion-meta { display: flex; align-items: center; gap: 8px; min-height: 28px; margin-top: 4px; font-size: 12px; }
 .comparison-submit { width: 100%; justify-content: center; min-height: 38px; margin-top: 8px; }
+.comparison-block-reason { margin: 6px 0 0; text-align: center; }
 .comparison-results { margin-top: 28px; }
 .comparison-results-head { margin-bottom: 14px; }
 .comparison-results-head > div:first-child { min-width: 0; }
 .comparison-results-head .pill { margin-left: auto; }
+.comparison-scorebar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.comparison-scorebar article {
+  padding: 11px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.comparison-scorebar strong { display: block; margin-top: 2px; font-size: 22px; line-height: 1.2; }
 .comparison-contrasts { display: grid; gap: 0; margin: 14px 0 18px; border-top: 1px solid var(--line); }
 .comparison-contrasts > div {
   display: grid;
@@ -622,21 +797,34 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
-.comparison-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
-.comparison-table { width: 100%; min-width: 1320px; border-collapse: collapse; background: var(--card); }
-.comparison-table th,
-.comparison-table td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
-.comparison-table th { font-size: 12px; color: var(--dim); background: var(--panel); font-weight: 500; }
-.comparison-table tbody tr:last-child td { border-bottom: 0; }
-.comparison-table td:first-child { min-width: 150px; }
-.comparison-table td:nth-child(2) { min-width: 76px; }
-.comparison-table td:nth-child(3),
-.comparison-table td:nth-child(4) { min-width: 180px; }
-.comparison-table td:nth-child(5) { min-width: 200px; }
-.comparison-table td:nth-child(6),
-.comparison-table td:nth-child(7) { min-width: 210px; }
-.comparison-table td:first-child span,
-.comparison-table td small { display: block; margin-top: 3px; color: var(--dim); line-height: 1.5; }
+.comparison-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 24px;
+}
+.comparison-overview-card {
+  min-width: 0;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.comparison-overview-card header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.comparison-overview-card header > div { min-width: 0; flex: 1; }
+.comparison-overview-card strong { display: block; overflow-wrap: anywhere; font-size: 15px; }
+.comparison-overview-card p { margin: 0 0 10px; line-height: 1.65; }
+.comparison-overview-card dl { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 6px 8px; margin: 0; }
+.comparison-overview-card dt { color: var(--dim); font-size: 12px; }
+.comparison-overview-card dd { display: flex; align-items: flex-start; gap: 7px; margin: 0; min-width: 0; line-height: 1.55; }
+.comparison-overview-card dd .comparison-score { flex: none; }
+.comparison-axis-list dt { display: flex; align-items: center; gap: 4px; }
+.comparison-subtitle { margin: 24px 0 4px; font-size: 15px; }
 .comparison-score {
   display: inline-flex;
   align-items: center;
@@ -654,13 +842,17 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .comparison-detail { padding: 22px 0; border-bottom: 1px solid var(--line); }
 .comparison-detail > header { align-items: center; margin-bottom: 14px; }
 .comparison-detail > header .muted { font-size: 12px; }
+.comparison-detail > header p { margin: 4px 0 0; max-width: 760px; line-height: 1.7; }
 .comparison-detail-meta { display: flex; align-items: center; gap: 7px; margin-left: auto; }
 .comparison-detail-meta small { color: var(--dim); }
 .comparison-detail-meta .pill { margin-left: 5px; }
 .comparison-technical-summary { display: flex; align-items: center; gap: 8px; }
 .comparison-technical-summary span { color: var(--warn); font-size: 12px; }
+.comparison-technical-summary span.plus { color: var(--accent); }
+.comparison-technical-summary span.flat { color: var(--dim); }
 .comparison-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 30px; }
 .comparison-detail-grid section { min-width: 0; }
+.comparison-detail-grid section.wide { grid-column: 1 / -1; }
 .comparison-detail-grid h4 { margin: 0 0 6px; font-size: 13px; }
 .comparison-detail-grid p { margin: 0 0 8px; }
 .comparison-detail-grid ul { margin: 0; padding-left: 18px; }
@@ -669,6 +861,25 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .comparison-detail-grid li span,
 .comparison-detail-grid li small { display: block; }
 .comparison-detail-grid li small { color: var(--dim); }
+.comparison-axis-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+.comparison-axis-cards article {
+  padding: 11px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.comparison-axis-cards strong { display: flex; align-items: center; gap: 5px; margin-bottom: 7px; font-size: 13px; }
+.comparison-axis-cards p { margin: 8px 0 0; line-height: 1.65; }
+.comparison-conflicts { margin-top: 8px; padding-left: 18px; color: var(--warn); }
+.comparison-jd-checklist ul { padding-left: 0; list-style: none; display: grid; gap: 8px; }
+.comparison-jd-checklist li { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 6px; background: var(--card); }
+.comparison-jd-checklist li.check-fit { border-left-color: var(--accent); }
+.comparison-jd-checklist li.check-partial { border-left-color: #c59a2d; }
+.comparison-jd-checklist li.check-gap { border-left-color: var(--warn); }
+.comparison-jd-checklist li.check-unclear { border-left-color: var(--dim); }
+.comparison-jd-checklist li strong { display: flex; align-items: baseline; gap: 8px; }
+.comparison-jd-checklist li strong span { display: inline-flex; flex: none; font-size: 12px; color: var(--dim); }
+.comparison-jd-checklist li em { display: block; margin: 4px 0; color: var(--text); font-style: normal; line-height: 1.6; }
 
 /* ---- 窄屏兜底。桌面优先，这里只保证「能用」，不做专门的移动端交互 ---- */
 
@@ -698,7 +909,8 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   .banner { padding: 10px 14px; }
   .content { padding: 14px; }
 
-  .cols, .quick, .fields, .company-layout, .company-form, .experience-form { grid-template-columns: minmax(0, 1fr); }
+  .cols, .quick, .fields, .company-layout, .company-form, .experience-form, .fill-grid { grid-template-columns: minmax(0, 1fr); }
+  .fill-field.wide { grid-column: 1; }
   .company-create { grid-template-columns: minmax(0, 1fr); }
   .company-list { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
   .company-card { flex: 0 0 220px; }
@@ -715,6 +927,10 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   .comparison-picker { padding: 16px 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .comparison-criteria { padding: 16px 0; }
   .comparison-company-list { max-height: 420px; }
+  .comparison-stage-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .comparison-stage-buttons button:nth-child(2) { border-right: 1px solid var(--line); border-radius: 0 6px 6px 0; }
+  .comparison-stage-buttons button:nth-child(3) { border-radius: 6px 0 0 6px; }
+  .comparison-scorebar, .comparison-overview-grid, .comparison-axis-cards { grid-template-columns: minmax(0, 1fr); }
   .comparison-detail-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
   .comparison-contrasts > div { grid-template-columns: minmax(0, 1fr); gap: 3px; }
 

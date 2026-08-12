@@ -25,6 +25,7 @@ export const resumeRoutes = [
           .filter((experience) => experience.title && (experience.summary || experience.content))
           .map((experience) => [
             `## ${experience.title}`,
+            `经历类型：${experience.type || "未分类"}`,
             `能力标签：${(experience.tags || []).join("、") || "未标注"}`,
             `经历摘要：${experience.summary || "未填写"}`,
             `经历正文：\n${experience.content || "未填写"}`,

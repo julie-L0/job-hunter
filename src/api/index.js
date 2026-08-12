@@ -2,12 +2,13 @@ import { createApp, createSession, isAuthRequired } from "../http/app.js";
 import { config } from "../config.js";
 import { isMock } from "../llm/provider.js";
 import { listFields } from "../storage/bitable.js";
-import { JOB_STATUSES, RESUME_REQUIRED_STATUSES } from "../storage/schema.js";
+import { COMPARISON_STAGES, EXPERIENCE_TYPES, JOB_STATUSES, RESUME_REQUIRED_STATUSES } from "../storage/schema.js";
 import { companyRoutes } from "./companies.js";
 import { jobRoutes } from "./jobs.js";
 import { resumeRoutes } from "./resumes.js";
 import { experienceRoutes } from "./experiences.js";
 import { aiRoutes } from "./ai.js";
+import { preferenceRoutes } from "./preferences.js";
 
 const systemRoutes = [
   {
@@ -22,6 +23,8 @@ const systemRoutes = [
       // 前端的看板列和状态下拉都从这里取，避免在前端再硬编码一份中文选项
       jobStatuses: JOB_STATUSES,
       resumeRequiredStatuses: [...RESUME_REQUIRED_STATUSES],
+      experienceTypes: EXPERIENCE_TYPES,
+      comparisonStages: COMPARISON_STAGES,
     }),
   },
   {
@@ -44,6 +47,7 @@ export const routes = [
   ...jobRoutes,
   ...resumeRoutes,
   ...experienceRoutes,
+  ...preferenceRoutes,
   ...aiRoutes,
 ];
 

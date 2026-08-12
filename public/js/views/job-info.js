@@ -1,8 +1,10 @@
 import { api } from "../api.js";
 import {
+  JOB_STAR_VALUE,
   currentJobRef,
   dropJob,
   handleError,
+  isStarredJob,
   mergeJob,
   openCompanyLibrary,
   resumeCodes,
@@ -42,6 +44,15 @@ export const JobInfo = {
 
     const save = (key, transform = (value) => value) => (value) => patch({ [key]: transform(value) });
     const orNull = (value) => value === "" ? null : value;
+
+    async function toggleStar() {
+      try {
+        await patch({ starred: isStarredJob(job.value) ? "" : JOB_STAR_VALUE });
+        toast(isStarredJob(job.value) ? "已标记为下一批" : "已取消星标");
+      } catch (failure) {
+        if (!handleError(failure)) toast(failure.message);
+      }
+    }
 
     async function createDoc() {
       if (docBusy.value) return;
@@ -104,6 +115,8 @@ export const JobInfo = {
       introDone,
       resumeHint,
       save,
+      toggleStar,
+      isStarredJob,
       orNull,
       dayStr,
       createDoc,
@@ -123,6 +136,11 @@ export const JobInfo = {
           <a v-if="job.siteUrl" :href="job.siteUrl" target="_blank" rel="noreferrer">官网</a>
         </div>
         <span class="grow"></span>
+        <button class="star-button star-button-label" :class="{ on: isStarredJob(job) }"
+          :disabled="state.offline" @click="toggleStar">
+          <span>{{ isStarredJob(job) ? '★' : '☆' }}</span>
+          <span>{{ isStarredJob(job) ? '下一批' : '标记下一批' }}</span>
+        </button>
         <button class="ghost" @click="openCompanyLibrary(job.companyId)">编辑公司</button>
       </header>
 
