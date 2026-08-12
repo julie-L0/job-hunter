@@ -7,6 +7,7 @@ import {
   updateRecord,
 } from "../storage/bitable.js";
 import {
+  JOB_STAR_VALUE,
   JOB_STATUSES,
   RESUME_CODE_PATTERN,
   RESUME_REQUIRED_STATUSES,
@@ -21,6 +22,7 @@ const JOB_PATCH_FIELDS = new Set([
   "deadline",
   "referralCode",
   "status",
+  "starred",
   "resumeId",
   "prepDocUrl",
   "intro1min",
@@ -34,6 +36,10 @@ function pickPatch(body) {
   const patch = {};
   for (const [key, value] of Object.entries(body)) {
     if (!JOB_PATCH_FIELDS.has(key)) continue;
+    if (key === "starred") {
+      patch.starred = value ? JOB_STAR_VALUE : "";
+      continue;
+    }
     patch[key] = ["position", "status", "resumeId"].includes(key)
       ? String(value || "").trim()
       : value;
@@ -101,6 +107,7 @@ export const jobRoutes = [
         status: String(body.status || "待投").trim(),
         resumeId: String(body.resumeId || "").trim(),
       };
+      if (body.starred) patch.starred = JOB_STAR_VALUE;
       if (body.deadline !== undefined && body.deadline !== "") patch.deadline = body.deadline;
 
       const company = await validateJob(patch);

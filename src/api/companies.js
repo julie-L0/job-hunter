@@ -1,5 +1,5 @@
 import { HttpError, requireBody } from "../http/app.js";
-import { createRecord, updateRecord } from "../storage/bitable.js";
+import { createRecord, deleteRecord, listRecords, updateRecord } from "../storage/bitable.js";
 import {
   assertCompanyNameAvailable,
   getCompany,
@@ -61,6 +61,20 @@ export const companyRoutes = [
       const patch = pickPatch(body);
       if ("name" in patch) await assertCompanyNameAvailable(patch.name, params.recordId);
       return updateRecord("company", params.recordId, patch);
+    }),
+  },
+  {
+    method: "DELETE",
+    path: "/api/companies/:recordId",
+    handler: ({ params }) => serializeCompanyWrite(async () => {
+      const company = await getCompany(params.recordId);
+      const linkedJobs = (await listRecords("main"))
+        .filter((job) => String(job.companyId || "") === params.recordId)
+        .filter((job) => String(job.position || "").trim());
+      if (linkedJobs.length) {
+        throw new HttpError(409, `公司「${company.name}」下面还有 ${linkedJobs.length} 个岗位，先删除或迁移岗位后再删公司`);
+      }
+      return deleteRecord("company", params.recordId);
     }),
   },
 ];

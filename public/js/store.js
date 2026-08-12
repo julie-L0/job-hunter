@@ -28,10 +28,14 @@ export const state = reactive({
 });
 
 export const statuses = computed(() => state.health.jobStatuses || []);
+export const experienceTypes = computed(() => state.health.experienceTypes || []);
+export const comparisonStages = computed(() => state.health.comparisonStages || []);
 export const ACTIVE_STATUSES = computed(() => statuses.value.filter((s) => !isClosed(s)));
 
+export const JOB_STAR_VALUE = "星标";
 const CLOSED = new Set(["挂", "offer"]);
 export const isClosed = (status) => CLOSED.has(status);
+export const isStarredJob = (job) => Boolean(job?.starred);
 export const statusRequiresResume = (status) =>
   (state.health.resumeRequiredStatuses || []).includes(status);
 
@@ -148,6 +152,18 @@ export function mergeCompany(company) {
     companyBackground: company.companyBackground || "",
     companyNote: company.note || "",
   } : job);
+  snapshot.save({
+    companies: state.companies,
+    jobs: state.jobs,
+    resumes: state.resumes,
+    experiences: state.experiences,
+    tags: state.tags,
+  });
+}
+
+export function dropCompany(recordId) {
+  state.companies = state.companies.filter((company) => company.recordId !== recordId);
+  if (state.currentCompanyId === recordId) state.currentCompanyId = state.companies[0]?.recordId || null;
   snapshot.save({
     companies: state.companies,
     jobs: state.jobs,

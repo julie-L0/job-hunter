@@ -76,6 +76,10 @@ export const api = {
   companies: () => request("GET", "/api/companies"),
   createCompany: (patch) => request("POST", "/api/companies", patch),
   patchCompany: (recordId, patch) => request("PATCH", `/api/companies/${recordId}`, patch),
+  deleteCompany: (recordId) => request("DELETE", `/api/companies/${recordId}`),
+
+  comparisonPreference: () => request("GET", "/api/preferences/comparison"),
+  patchComparisonPreference: (patch) => request("PATCH", "/api/preferences/comparison", patch),
 
   jobs: () => request("GET", "/api/jobs"),
   createJob: (patch) => request("POST", "/api/jobs", patch),
@@ -101,6 +105,7 @@ export const api = {
     request("POST", `/api/experiences/${recordId}/interview-question`, payload),
 
   compareJobs: (payload) => request("POST", "/api/job-comparison", payload),
+  fillFormLibrary: () => request("GET", "/api/fill-form/library"),
   splitForm: (rawText) => request("POST", "/api/fill-form/split", { rawText }),
   answerForm: (payload) => request("POST", "/api/fill-form/answer", payload),
   reviseForm: (payload) => request("POST", "/api/fill-form/revise", payload),

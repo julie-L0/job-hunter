@@ -18,6 +18,7 @@ export const config = {
       main: process.env.BITABLE_TABLE_MAIN || "",
       experience: process.env.BITABLE_TABLE_EXPERIENCE || "",
       resume: process.env.BITABLE_TABLE_RESUME || "",
+      preference: process.env.BITABLE_TABLE_PREFERENCE || "",
     },
   },
 

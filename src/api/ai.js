@@ -9,6 +9,8 @@ import {
   mockComparisonResult,
   normalizeComparisonResult,
 } from "../services/job-comparison.js";
+import { getComparisonPreference } from "../services/preferences.js";
+import { buildFixedFillFormLibrary, hasRepeatableFormFields, parseOpenQuestions } from "../services/fill-form.js";
 import { appendDocText } from "../services/prep-doc.js";
 
 const INTRO_VARIANTS = {
@@ -36,6 +38,7 @@ function experienceLibrary(experiences) {
     .filter((experience) => experience.title && (experience.summary || experience.content))
     .map((experience) => [
       `## ${experience.title}`,
+      `经历类型：${experience.type || "未分类"}`,
       `能力标签：${(experience.tags || []).join("、") || "未标注"}`,
       `经历摘要：${experience.summary || "未填写"}`,
       `经历正文：\n${experience.content || "未填写"}`,
@@ -48,46 +51,76 @@ export const aiRoutes = [
     method: "POST",
     path: "/api/job-comparison",
     handler: async ({ body }) => {
-      const [jobs, experiences] = await Promise.all([listJobs(), listRecords("experience")]);
+      const [jobs, experiences, resumes, preference] = await Promise.all([
+        listJobs(),
+        listRecords("experience"),
+        listRecords("resume"),
+        getComparisonPreference(),
+      ]);
       const context = buildComparisonContext({
         recordIds: body.recordIds,
         criterion: body.criterion,
         jobs,
         experiences,
+        resumes,
+        preference,
       });
       const prompt = await loadPrompt("job-comparison", {
         criterion: context.criterion,
+        preference_json: JSON.stringify(context.promptPreference, null, 2),
         jobs_json: JSON.stringify(context.promptJobs, null, 2),
         experiences_json: JSON.stringify(context.promptExperiences, null, 2),
+        resumes_json: JSON.stringify(context.promptResumes, null, 2),
       });
       const raw = await chatJson({
         messages: [{ role: "user", content: prompt }],
         temperature: 0.2,
-        mockShape: mockComparisonResult(context.selectedJobs, context.promptExperiences),
+        maxTokens: 8192,
+        retryInstruction: [
+          "上一条岗位比较回复不是完整合法 JSON，可能被截断。请重新输出完整 JSON 对象。",
+          "只输出 JSON，不要 Markdown，不要解释。",
+          "保持所有选中岗位的 recordId 都出现；文字说明压缩到每项 1 句，jdChecklist 每岗 4 条以内，matchedExperiences 每岗 2 条以内，risks/prepFocus 每岗 2 条以内。",
+          "不要省略必填字段，不要输出综合分。",
+        ].join("\n"),
+        mockShape: mockComparisonResult(context.selectedJobs, context.promptExperiences, context.preference),
       });
       return {
-        ...normalizeComparisonResult(raw, context.selectedJobs),
+        ...normalizeComparisonResult({ ...raw, preference: raw.preference || context.preference }, context.selectedJobs),
         mock: Boolean(raw.mock),
       };
     },
   },
   {
-    // 第一步：把网页复制来的原始文本拆成题目，交给用户确认后再逐题生成
+    // 固定资料架：实习/项目/校园/荣誉/语言证书；不确定分类单独让用户确认。
+    method: "GET",
+    path: "/api/fill-form/library",
+    handler: async () => buildFixedFillFormLibrary(await listRecords("experience")),
+  },
+  {
+    // 开放题粘贴区：只识别真正需要 AI 作答的问题，不处理可重复经历字段组。
     method: "POST",
     path: "/api/fill-form/split",
     handler: async ({ body }) => {
       requireBody(body, ["rawText"]);
+      const questions = parseOpenQuestions(body.rawText);
+      if (questions.length) return { mode: "questions", sections: [], questions, warnings: [] };
+      if (hasRepeatableFormFields(body.rawText)) {
+        return {
+          mode: "questions",
+          sections: [],
+          questions: [],
+          warnings: ["这是经历类可重复字段，请直接使用页面上方固定资料架复制。"],
+        };
+      }
+
       const prompt = await loadPrompt("fill-form-split", { raw_text: body.rawText });
-      return chatJson({
+      const result = await chatJson({
         messages: [{ role: "user", content: prompt }],
         mockShape: {
-          questions: [
-            { question: "请描述一次你推动跨部门协作的经历（MOCK 占位题）", limit: 300 },
-            { question: "你为什么选择这个岗位？（MOCK 占位题）", limit: 200 },
-            { question: "还有什么希望我们了解的？（MOCK 占位题）", limit: null },
-          ],
+          questions: parseOpenQuestions(body.rawText),
         },
       });
+      return { mode: "questions", sections: [], warnings: [], ...result };
     },
   },
   {

@@ -1,6 +1,9 @@
 import { api } from "../api.js";
 import {
+  JOB_STAR_VALUE,
+  dropCompany,
   handleError,
+  isStarredJob,
   mergeCompany,
   mergeJob,
   resumeCodes,
@@ -10,7 +13,7 @@ import {
   statuses,
   toast,
 } from "../store.js";
-import { ddlLabel } from "../ui.js";
+import { confirmDialog, ddlLabel } from "../ui.js";
 
 const { computed, reactive, ref, watch } = window.Vue;
 
@@ -31,6 +34,7 @@ export const CompanyLibrary = {
     const mode = ref("");
     const adding = reactive({ name: "", siteUrl: "", busy: false, error: "" });
     const editing = reactive({ name: "", siteUrl: "", companyBackground: "", note: "", busy: false, error: "" });
+    const deleting = ref(false);
     const jobForm = reactive(blankJob());
 
     const companies = computed(() => [...state.companies].sort((a, b) =>
@@ -42,7 +46,10 @@ export const CompanyLibrary = {
     const companyJobs = computed(() => selected.value
       ? state.jobs
         .filter((job) => job.companyId === selected.value.recordId)
-        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+        .sort((a, b) => {
+          const starOrder = Number(isStarredJob(b)) - Number(isStarredJob(a));
+          return starOrder || (b.createdAt || 0) - (a.createdAt || 0);
+        })
       : [],
     );
     const counts = computed(() => new Map(
@@ -123,6 +130,32 @@ export const CompanyLibrary = {
       }
     }
 
+    async function deleteCompany() {
+      if (!selected.value || deleting.value) return;
+      if (companyJobs.value.length) {
+        toast(`公司下面还有 ${companyJobs.value.length} 个岗位，先删除或迁移岗位后再删公司`);
+        return;
+      }
+      const target = selected.value;
+      const ok = await confirmDialog({
+        title: `删除公司「${target.name}」？`,
+        body: "会从飞书公司库删除这家公司。只有没有任何岗位关联的公司才能删除；这个操作不可恢复。",
+        danger: true,
+      });
+      if (!ok) return;
+      deleting.value = true;
+      try {
+        await api.deleteCompany(target.recordId);
+        dropCompany(target.recordId);
+        mode.value = "";
+        toast("公司已删除");
+      } catch (failure) {
+        if (!handleError(failure)) toast(failure.message);
+      } finally {
+        deleting.value = false;
+      }
+    }
+
     function beginJob() {
       Object.assign(jobForm, blankJob());
       mode.value = "job";
@@ -170,6 +203,20 @@ export const CompanyLibrary = {
       location.hash = "#/job/info";
     }
 
+    async function toggleStar(job, event) {
+      event?.stopPropagation();
+      if (!job || state.offline) return;
+      try {
+        const result = await api.patchJob(job.recordId, {
+          starred: isStarredJob(job) ? "" : JOB_STAR_VALUE,
+        });
+        mergeJob(result.job);
+        toast(isStarredJob(result.job) ? "已标记为下一批" : "已取消星标");
+      } catch (failure) {
+        if (!handleError(failure)) toast(failure.message);
+      }
+    }
+
     return {
       state,
       companies,
@@ -182,14 +229,18 @@ export const CompanyLibrary = {
       mode,
       adding,
       editing,
+      deleting,
       jobForm,
       selectCompany,
       addCompany,
       beginEdit,
       saveCompany,
+      deleteCompany,
       beginJob,
       createJob,
       openJob,
+      toggleStar,
+      isStarredJob,
       ddlLabel,
     };
   },
@@ -227,6 +278,7 @@ export const CompanyLibrary = {
             </div>
             <span class="grow"></span>
             <button class="ghost" :disabled="state.offline" @click="beginEdit">编辑公司</button>
+            <button class="danger" :disabled="state.offline || deleting" @click="deleteCompany">{{ deleting ? '删除中…' : '删除公司' }}</button>
             <button class="primary" :disabled="state.offline" @click="beginJob">新建岗位</button>
           </header>
 
@@ -267,12 +319,17 @@ export const CompanyLibrary = {
 
           <section class="company-jobs">
             <h3>已有岗位 <em>{{ companyJobs.length }}</em></h3>
-            <button v-for="job in companyJobs" :key="job.recordId" class="company-job" @click="openJob(job.recordId)">
+            <article v-for="job in companyJobs" :key="job.recordId"
+              :class="['company-job', { starred: isStarredJob(job) }]" role="button" tabindex="0"
+              @click="openJob(job.recordId)" @keydown.enter.self.prevent="openJob(job.recordId)" @keydown.space.self.prevent="openJob(job.recordId)">
+              <button class="star-button compact" :class="{ on: isStarredJob(job) }"
+                :disabled="state.offline" :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
+                @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
               <span class="dot" :class="'s-' + job.status"></span>
               <strong>{{ job.position }}</strong>
               <span class="pill">{{ job.status }}</span>
               <small v-if="job.deadline">{{ ddlLabel(job.deadline) }}</small>
-            </button>
+            </article>
             <p v-if="!companyJobs.length" class="muted">还没有岗位。</p>
           </section>
         </section>
