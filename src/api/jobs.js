@@ -14,6 +14,7 @@ import {
 } from "../storage/schema.js";
 import { getCompany, getJob, hydrateJob, listJobs } from "../services/companies.js";
 import { recomputeApplyRecords } from "../services/resume.js";
+import { appendStatusHistory } from "../services/status-history.js";
 import { createPrepDoc } from "../services/prep-doc.js";
 
 const JOB_PATCH_FIELDS = new Set([
@@ -129,6 +130,14 @@ export const jobRoutes = [
       if (!String(current.position || "").trim()) throw new HttpError(404, "岗位不存在");
       const patch = pickPatch(body);
       const company = await validateJob({ ...current, ...patch });
+      if ("status" in patch && patch.status !== current.status) {
+        patch.statusHistory = appendStatusHistory(current.statusHistory, {
+          at: body.statusChangedAt,
+          from: current.status,
+          to: patch.status,
+          resumeId: "resumeId" in patch ? patch.resumeId : current.resumeId,
+        });
+      }
       const updated = await updateRecord("main", params.recordId, patch);
       const persistedPatch = Object.fromEntries(
         Object.keys(patch).map((key) => [key, updated[key]]),

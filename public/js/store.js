@@ -1,8 +1,9 @@
 // 全局状态。三件事：数据、当前岗位、降级。
-// 降级的核心约定：飞书不通时不清空已有数据，用 localStorage 快照继续渲染，只禁掉写操作。
+// 降级的核心约定：飞书不通时不清空已有数据，用 localStorage 快照继续渲染，岗位改动先进 outbox。
 // 「看不到今天要投哪几个」比「看到的是 8 分钟前的」严重得多。
 import { AuthError, ConfigError, NetError, api, token } from "./api.js";
-import { currentJob, snapshot } from "./persist.js";
+import { currentJob, outbox, snapshot } from "./persist.js";
+import { appendStatusHistory } from "./status-history.js";
 
 const { reactive, computed } = window.Vue;
 
@@ -23,6 +24,9 @@ export const state = reactive({
   loading: false,
   offline: false,
   snapshotAt: null,
+  outbox: outbox.load(),
+  syncing: false,
+  syncError: "",
   configError: "",
   toast: "",
 });
@@ -31,6 +35,7 @@ export const statuses = computed(() => state.health.jobStatuses || []);
 export const experienceTypes = computed(() => state.health.experienceTypes || []);
 export const comparisonStages = computed(() => state.health.comparisonStages || []);
 export const ACTIVE_STATUSES = computed(() => statuses.value.filter((s) => !isClosed(s)));
+export const pendingSyncCount = computed(() => state.outbox.length);
 
 export const JOB_STAR_VALUE = "星标";
 const CLOSED = new Set(["挂", "offer"]);
@@ -61,6 +66,40 @@ export function openCompanyLibrary(recordId) {
 export function toast(message) {
   state.toast = message;
   if (message) setTimeout(() => (state.toast === message ? (state.toast = "") : null), 4000);
+}
+
+function saveSnapshot() {
+  snapshot.save({
+    companies: state.companies,
+    jobs: state.jobs,
+    resumes: state.resumes,
+    experiences: state.experiences,
+    tags: state.tags,
+  });
+}
+
+function persistOutbox(items) {
+  state.outbox = Array.isArray(items) ? items : [];
+  outbox.save(state.outbox);
+}
+
+function pendingForJob(recordId) {
+  return state.outbox.some((item) => item.kind === "job.patch" && item.recordId === recordId);
+}
+
+function applyQueuedJobPatches() {
+  for (const item of state.outbox) {
+    if (item.kind !== "job.patch") continue;
+    const index = state.jobs.findIndex((job) => job.recordId === item.recordId);
+    if (index < 0) continue;
+    const localPatch = item.statusChange
+      ? {
+        ...item.patch,
+        statusHistory: appendStatusHistory(state.jobs[index].statusHistory, item.statusChange),
+      }
+      : item.patch;
+    state.jobs[index] = { ...state.jobs[index], ...localPatch, pendingSync: true };
+  }
 }
 
 /** 把 AuthError / ConfigError / NetError 收敛成全局状态，其余原样抛给调用方就地显示。 */
@@ -115,6 +154,7 @@ export async function loadAll({ silent = false } = {}) {
     state.experiences = cached.experiences || [];
     state.tags = cached.tags || [];
     state.snapshotAt = cached.at || null;
+    applyQueuedJobPatches();
   }
 
   if (!silent) state.loading = true;
@@ -131,9 +171,11 @@ export async function loadAll({ silent = false } = {}) {
     state.resumes = resumes;
     state.experiences = experiences;
     state.tags = tags;
+    applyQueuedJobPatches();
     state.offline = false;
     state.snapshotAt = Date.now();
-    snapshot.save({ companies, jobs, resumes, experiences, tags });
+    saveSnapshot();
+    scheduleOutboxSync();
   } catch (error) {
     handleError(error);
   } finally {
@@ -152,39 +194,138 @@ export function mergeCompany(company) {
     companyBackground: company.companyBackground || "",
     companyNote: company.note || "",
   } : job);
-  snapshot.save({
-    companies: state.companies,
-    jobs: state.jobs,
-    resumes: state.resumes,
-    experiences: state.experiences,
-    tags: state.tags,
-  });
+  saveSnapshot();
 }
 
 export function dropCompany(recordId) {
   state.companies = state.companies.filter((company) => company.recordId !== recordId);
   if (state.currentCompanyId === recordId) state.currentCompanyId = state.companies[0]?.recordId || null;
-  snapshot.save({
-    companies: state.companies,
-    jobs: state.jobs,
-    resumes: state.resumes,
-    experiences: state.experiences,
-    tags: state.tags,
-  });
+  saveSnapshot();
 }
 
 /** 单条岗位改完后就地替换，不重拉整表。 */
 export function mergeJob(job) {
   const index = state.jobs.findIndex((item) => item.recordId === job.recordId);
-  if (index >= 0) state.jobs[index] = { ...state.jobs[index], ...job };
-  else state.jobs.push(job);
-  snapshot.save({
-    companies: state.companies,
-    jobs: state.jobs,
-    resumes: state.resumes,
-    experiences: state.experiences,
-    tags: state.tags,
-  });
+  const next = { ...job, pendingSync: pendingForJob(job.recordId) };
+  if (index >= 0) state.jobs[index] = { ...state.jobs[index], ...next };
+  else state.jobs.push(next);
+  saveSnapshot();
+}
+
+function cleanedPatch(patch) {
+  return Object.fromEntries(Object.entries(patch || {}).filter(([, value]) => value !== undefined));
+}
+
+function enqueueJobPatch(recordId, patch, statusChange = null) {
+  const now = Date.now();
+  const items = [...state.outbox];
+  let target = null;
+  if (!statusChange) {
+    target = [...items].reverse().find(
+      (item) => item.kind === "job.patch" && item.recordId === recordId && !item.statusChange,
+    );
+  }
+  if (target) {
+    target.patch = { ...target.patch, ...patch };
+    target.updatedAt = now;
+    target.error = "";
+  } else {
+    items.push({
+      id: `job.patch:${recordId}:${now}:${Math.random().toString(36).slice(2, 8)}`,
+      kind: "job.patch",
+      recordId,
+      patch,
+      statusChange,
+      createdAt: now,
+      updatedAt: now,
+      attempts: 0,
+      error: "",
+    });
+  }
+  persistOutbox(items);
+}
+
+export async function saveJobPatch(recordId, patch) {
+  const current = state.jobs.find((item) => item.recordId === recordId);
+  if (!current) throw new Error("岗位不存在，请刷新后重试");
+  const cleanPatch = cleanedPatch(patch);
+  if (!Object.keys(cleanPatch).length) return { queued: false };
+
+  const next = { ...current, ...cleanPatch };
+  if (statusRequiresResume(next.status) && !String(next.resumeId || "").trim()) {
+    throw new Error(`状态为「${next.status}」时必须选择简历`);
+  }
+
+  const statusChange = "status" in cleanPatch && cleanPatch.status !== current.status
+    ? {
+      at: Date.now(),
+      from: current.status || "",
+      to: cleanPatch.status || "",
+      resumeId: "resumeId" in cleanPatch ? cleanPatch.resumeId : current.resumeId || "",
+    }
+    : null;
+  const localPatch = statusChange
+    ? { ...cleanPatch, statusHistory: appendStatusHistory(current.statusHistory, statusChange) }
+    : cleanPatch;
+
+  enqueueJobPatch(recordId, cleanPatch, statusChange);
+  mergeJob({ recordId, ...localPatch, pendingSync: true });
+  scheduleOutboxSync();
+  return { queued: true };
+}
+
+let syncTimer = null;
+
+export function scheduleOutboxSync(delay = 0) {
+  if (!state.outbox.length) return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    syncTimer = null;
+    void flushOutbox();
+  }, delay);
+}
+
+async function syncOutboxItem(item) {
+  if (item.kind !== "job.patch") throw new Error(`未知同步任务：${item.kind}`);
+  const payload = { ...item.patch };
+  if (item.statusChange) payload.statusChangedAt = item.statusChange.at;
+  const result = await api.patchJob(item.recordId, payload);
+  const remaining = state.outbox.filter((candidate) => candidate.id !== item.id);
+  persistOutbox(remaining);
+  mergeJob(result.job);
+  applyQueuedJobPatches();
+  saveSnapshot();
+  if (result.warning) toast(result.warning);
+}
+
+export async function flushOutbox() {
+  if (state.syncing || !state.outbox.length || !state.authed) return;
+  state.syncing = true;
+  state.syncError = "";
+  try {
+    while (state.outbox.length) {
+      const item = state.outbox[0];
+      try {
+        await syncOutboxItem(item);
+        state.offline = false;
+      } catch (error) {
+        const items = [...state.outbox];
+        const failed = items.find((candidate) => candidate.id === item.id);
+        if (failed) {
+          failed.attempts = (failed.attempts || 0) + 1;
+          failed.error = error.message || "同步失败";
+          failed.updatedAt = Date.now();
+          persistOutbox(items);
+        }
+        if (error instanceof NetError) state.offline = true;
+        else handleError(error);
+        state.syncError = error.message || "同步失败";
+        break;
+      }
+    }
+  } finally {
+    state.syncing = false;
+  }
 }
 
 export function mergeResume(resume) {
@@ -201,27 +342,20 @@ export function mergeExperience(experience) {
 
 export function dropExperience(recordId) {
   state.experiences = state.experiences.filter((experience) => experience.recordId !== recordId);
-  snapshot.save({
-    companies: state.companies,
-    jobs: state.jobs,
-    resumes: state.resumes,
-    experiences: state.experiences,
-    tags: state.tags,
-  });
+  saveSnapshot();
 }
 
 export function dropJob(recordId) {
   state.jobs = state.jobs.filter((job) => job.recordId !== recordId);
   if (state.currentJobId === recordId) setCurrentJob(null);
-  snapshot.save({
-    companies: state.companies,
-    jobs: state.jobs,
-    resumes: state.resumes,
-    experiences: state.experiences,
-    tags: state.tags,
-  });
+  persistOutbox(state.outbox.filter((item) => item.recordId !== recordId));
+  saveSnapshot();
 }
 
 export const resumeCodes = computed(() =>
   state.resumes.map((resume) => resume.code).filter(Boolean).sort(),
 );
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => scheduleOutboxSync(250));
+}

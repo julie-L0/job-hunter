@@ -26,6 +26,7 @@ export const SCHEMAS = {
       referralCode: { name: "内推码", type: "text" },
       status: { name: "状态", type: "select" },
       starred: { name: "星标", type: "select" },
+      statusHistory: { name: "状态记录", type: "text" },
       resumeId: { name: "简历编号", type: "text" },
       prepDocUrl: { name: "准备文档链接", type: "text" },
       intro1min: { name: "自我介绍-1min", type: "text" },

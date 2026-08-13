@@ -7,6 +7,7 @@ import {
   mergeCompany,
   mergeJob,
   resumeCodes,
+  saveJobPatch,
   setCurrentJob,
   state,
   statusRequiresResume,
@@ -205,13 +206,13 @@ export const CompanyLibrary = {
 
     async function toggleStar(job, event) {
       event?.stopPropagation();
-      if (!job || state.offline) return;
+      if (!job) return;
       try {
-        const result = await api.patchJob(job.recordId, {
-          starred: isStarredJob(job) ? "" : JOB_STAR_VALUE,
+        const nextStarred = !isStarredJob(job);
+        await saveJobPatch(job.recordId, {
+          starred: nextStarred ? JOB_STAR_VALUE : "",
         });
-        mergeJob(result.job);
-        toast(isStarredJob(result.job) ? "已标记为下一批" : "已取消星标");
+        toast(nextStarred ? "已标记为下一批" : "已取消星标");
       } catch (failure) {
         if (!handleError(failure)) toast(failure.message);
       }
@@ -323,11 +324,12 @@ export const CompanyLibrary = {
               :class="['company-job', { starred: isStarredJob(job) }]" role="button" tabindex="0"
               @click="openJob(job.recordId)" @keydown.enter.self.prevent="openJob(job.recordId)" @keydown.space.self.prevent="openJob(job.recordId)">
               <button class="star-button compact" :class="{ on: isStarredJob(job) }"
-                :disabled="state.offline" :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
+                :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
                 @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
               <span class="dot" :class="'s-' + job.status"></span>
               <strong>{{ job.position }}</strong>
               <span class="pill">{{ job.status }}</span>
+              <span v-if="job.pendingSync" class="pill warn">待同步</span>
               <small v-if="job.deadline">{{ ddlLabel(job.deadline) }}</small>
             </article>
             <p v-if="!companyJobs.length" class="muted">还没有岗位。</p>

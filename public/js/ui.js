@@ -179,11 +179,11 @@ export const FieldRow = {
       status.value = "saving";
       error.value = "";
       try {
-        await props.save(value);
+        const result = await props.save(value);
         saved.value = value;
-        status.value = "ok";
+        status.value = result?.queued ? "queued" : "ok";
         setTimeout(() => {
-          if (status.value === "ok") status.value = "idle";
+          if (["ok", "queued"].includes(status.value)) status.value = "idle";
         }, 1600);
       } catch (failure) {
         // 全局类错误（掉线/口令失效）也要进全局状态，但这一格照样显示 ✗
@@ -201,6 +201,7 @@ export const FieldRow = {
         <span class="flabel">{{ label }}</span>
         <span v-if="status === 'saving'" class="fstate">保存中…</span>
         <span v-else-if="status === 'ok'" class="fstate ok">已保存</span>
+        <span v-else-if="status === 'queued'" class="fstate ok">已暂存</span>
         <span v-else-if="status === 'error'" class="fstate bad">
           {{ error }} <button class="link" @click="commit(true)">重试</button>
         </span>

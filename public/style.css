@@ -189,6 +189,18 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 }
 .notice.bad { border-color: var(--warn-line); background: var(--warn-soft); color: var(--warn); }
 
+.status-history {
+  margin: 18px 0;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.status-history h3 { margin: 0 0 8px; font-size: 14px; }
+.status-history ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.status-history li { display: flex; gap: 12px; align-items: baseline; font-size: 13px; }
+.status-history time { width: 128px; flex: none; color: var(--dim); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
 .strip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
 .check { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .check.off { color: var(--dim); cursor: not-allowed; }
