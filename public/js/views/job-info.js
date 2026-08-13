@@ -1,4 +1,5 @@
 import { api } from "../api.js";
+import { formatStatusTime, parseStatusHistory, statusHistoryLabel } from "../status-history.js";
 import {
   JOB_STAR_VALUE,
   currentJobRef,
@@ -8,6 +9,7 @@ import {
   mergeJob,
   openCompanyLibrary,
   resumeCodes,
+  saveJobPatch,
   state,
   statusRequiresResume,
   statuses,
@@ -37,9 +39,7 @@ export const JobInfo = {
       if (statusRequiresResume(next.status) && !String(next.resumeId || "").trim()) {
         throw new Error(`状态为「${next.status}」时必须选择简历`);
       }
-      const result = await api.patchJob(job.value.recordId, fields);
-      mergeJob(result.job);
-      if (result.warning) toast(result.warning);
+      return saveJobPatch(job.value.recordId, fields);
     }
 
     const save = (key, transform = (value) => value) => (value) => patch({ [key]: transform(value) });
@@ -47,8 +47,9 @@ export const JobInfo = {
 
     async function toggleStar() {
       try {
-        await patch({ starred: isStarredJob(job.value) ? "" : JOB_STAR_VALUE });
-        toast(isStarredJob(job.value) ? "已标记为下一批" : "已取消星标");
+        const nextStarred = !isStarredJob(job.value);
+        await patch({ starred: nextStarred ? JOB_STAR_VALUE : "" });
+        toast(nextStarred ? "已标记为下一批" : "已取消星标");
       } catch (failure) {
         if (!handleError(failure)) toast(failure.message);
       }
@@ -99,6 +100,7 @@ export const JobInfo = {
     const introDone = computed(() =>
       INTRO_FIELDS.map(([key, label]) => ({ label, done: Boolean(job.value?.[key]) })),
     );
+    const statusHistory = computed(() => parseStatusHistory(job.value?.statusHistory).slice().reverse());
     const resumeHint = computed(() => job.value && statusRequiresResume(job.value.status)
       ? `状态为「${job.value.status}」，必须保留一份简历`
       : "待投阶段可留空",
@@ -113,12 +115,15 @@ export const JobInfo = {
       docError,
       orphanDocUrl,
       introDone,
+      statusHistory,
       resumeHint,
       save,
       toggleStar,
       isStarredJob,
       orNull,
       dayStr,
+      formatStatusTime,
+      statusHistoryLabel,
       createDoc,
       remove,
       openCompanyLibrary,
@@ -137,10 +142,11 @@ export const JobInfo = {
         </div>
         <span class="grow"></span>
         <button class="star-button star-button-label" :class="{ on: isStarredJob(job) }"
-          :disabled="state.offline" @click="toggleStar">
+          @click="toggleStar">
           <span>{{ isStarredJob(job) ? '★' : '☆' }}</span>
           <span>{{ isStarredJob(job) ? '下一批' : '标记下一批' }}</span>
         </button>
+        <span v-if="job.pendingSync" class="pill warn">待同步</span>
         <button class="ghost" @click="openCompanyLibrary(job.companyId)">编辑公司</button>
       </header>
 
@@ -151,20 +157,30 @@ export const JobInfo = {
 
       <div class="fields job-fields">
         <FieldRow label="状态" type="select" :options="statuses" :value="job.status"
-          :disabled="state.offline" :save="save('status')" />
+          :save="save('status')" />
         <FieldRow label="简历" type="select" :options="resumeCodes" :value="job.resumeId || ''"
-          empty-option="（未指定）" :hint="resumeHint" :disabled="state.offline"
+          empty-option="（未指定）" :hint="resumeHint"
           :save="save('resumeId', orNull)" />
-        <FieldRow label="岗位名" :value="job.position" :disabled="state.offline" :save="save('position')" />
+        <FieldRow label="岗位名" :value="job.position" :save="save('position')" />
         <FieldRow label="投递 DDL" type="date" :value="dayStr(job.deadline)"
-          hint="招满为止就留空" :disabled="state.offline" :save="save('deadline', orNull)" />
+          hint="招满为止就留空" :save="save('deadline', orNull)" />
         <FieldRow label="JD" type="textarea" :rows="16" :value="job.jd"
-          :disabled="state.offline" :save="save('jd')" wide />
+          :save="save('jd')" wide />
         <FieldRow label="内推码" :value="job.referralCode || ''"
-          :disabled="state.offline" :save="save('referralCode')" />
+          :save="save('referralCode')" />
         <FieldRow label="岗位备注" type="textarea" :rows="4" :value="job.note || ''"
-          :disabled="state.offline" :save="save('note')" wide />
+          :save="save('note')" wide />
       </div>
+
+      <section v-if="statusHistory.length" class="status-history">
+        <h3>状态记录</h3>
+        <ol>
+          <li v-for="item in statusHistory" :key="item.at + item.to">
+            <time>{{ formatStatusTime(item.at) }}</time>
+            <span>{{ statusHistoryLabel(item) }}</span>
+          </li>
+        </ol>
+      </section>
 
       <section class="strip">
         <span class="flabel">准备文档</span>

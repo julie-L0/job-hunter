@@ -30,6 +30,12 @@ export const snapshot = {
   save: (data) => write("snapshot", { at: Date.now(), ...data }),
 };
 
+export const outbox = {
+  load: () => read("outbox", []),
+  save: (items) => write("outbox", Array.isArray(items) ? items : []),
+  clear: () => remove("outbox"),
+};
+
 export const currentJob = {
   load: () => read("currentJobId", null),
   save: (recordId) => (recordId ? write("currentJobId", recordId) : remove("currentJobId")),

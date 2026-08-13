@@ -4,12 +4,11 @@ import {
   handleError,
   isClosed,
   isStarredJob,
-  mergeJob,
+  saveJobPatch,
   setCurrentJob,
   state,
   toast,
 } from "../store.js";
-import { api } from "../api.js";
 import { FieldRow, ageLabel, ddlLabel, isStale, isUrgent } from "../ui.js";
 import { CompanyLibrary } from "./company-library.js";
 
@@ -67,20 +66,20 @@ export const Board = {
     watch(() => detail.value?.recordId, () => { editJd.value = false; });
 
     async function saveJd(value) {
-      const result = await api.patchJob(detail.value.recordId, { jd: value });
-      mergeJob(result.job);
+      const result = await saveJobPatch(detail.value.recordId, { jd: value });
       editJd.value = true;
+      return result;
     }
 
     async function toggleStar(job, event) {
       event?.stopPropagation();
-      if (!job || state.offline) return;
+      if (!job) return;
       try {
-        const result = await api.patchJob(job.recordId, {
-          starred: isStarredJob(job) ? "" : JOB_STAR_VALUE,
+        const nextStarred = !isStarredJob(job);
+        await saveJobPatch(job.recordId, {
+          starred: nextStarred ? JOB_STAR_VALUE : "",
         });
-        mergeJob(result.job);
-        toast(isStarredJob(result.job) ? "已标记为下一批" : "已取消星标");
+        toast(nextStarred ? "已标记为下一批" : "已取消星标");
       } catch (failure) {
         if (!handleError(failure)) toast(failure.message);
       }
@@ -137,13 +136,14 @@ export const Board = {
               <div class="job-card-head">
                 <strong>{{ job.company }}</strong>
                 <button class="star-button compact" :class="{ on: isStarredJob(job) }"
-                  :disabled="state.offline" :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
+                  :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
                   @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
               </div>
               <span class="pos">{{ job.position }}</span>
               <small v-if="job.deadline" :class="{ bad: isUrgent(job) }">{{ ddlLabel(job.deadline) }}</small>
               <small v-else-if="job.status === '待投'" :class="{ bad: isStale(job) }">{{ ageLabel(job) }}</small>
               <small v-if="job.resumeId" class="muted">{{ job.resumeId }}</small>
+              <small v-if="job.pendingSync" class="bad">待同步</small>
             </article>
             <p v-if="!col.jobs.length" class="colempty">—</p>
           </section>
@@ -161,9 +161,10 @@ export const Board = {
               <strong>{{ job.company }}</strong>
               <span class="pos">{{ job.position }}</span>
               <small class="muted">{{ job.status }}</small>
+              <small v-if="job.pendingSync" class="bad">待同步</small>
               <span class="grow"></span>
               <button class="star-button compact" :class="{ on: isStarredJob(job) }"
-                :disabled="state.offline" :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
+                :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
                 @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
             </article>
             <p v-if="!closed.length" class="muted">还没有结束的岗位。</p>
@@ -181,13 +182,14 @@ export const Board = {
             <div class="job-card-head">
               <strong>{{ job.company }}</strong>
               <button class="star-button compact" :class="{ on: isStarredJob(job) }"
-                :disabled="state.offline" :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
+                :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
                 @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
             </div>
             <span class="pos">{{ job.position }}</span>
             <small v-if="job.deadline" :class="{ bad: isUrgent(job) }">{{ ddlLabel(job.deadline) }}</small>
             <small v-else-if="job.status === '待投'" :class="{ bad: isStale(job) }">{{ ageLabel(job) }}</small>
             <small v-if="tab === CLOSED_TAB" class="muted">{{ job.status }}</small>
+            <small v-if="job.pendingSync" class="bad">待同步</small>
           </article>
         </aside>
 
@@ -195,11 +197,12 @@ export const Board = {
           <header>
             <h2>{{ detail.company }} · {{ detail.position }}</h2>
             <button class="star-button star-button-label" :class="{ on: isStarredJob(detail) }"
-              :disabled="state.offline" @click="toggleStar(detail, $event)">
+              @click="toggleStar(detail, $event)">
               <span>{{ isStarredJob(detail) ? '★' : '☆' }}</span>
               <span>{{ isStarredJob(detail) ? '下一批' : '标记下一批' }}</span>
             </button>
             <span class="pill">{{ detail.status }}</span>
+            <span v-if="detail.pendingSync" class="pill warn">待同步</span>
             <span v-if="detail.deadline" class="pill" :class="{ warn: isUrgent(detail) }">{{ ddlLabel(detail.deadline) }}</span>
             <span v-else-if="detail.status === '待投'" class="pill" :class="{ warn: isStale(detail) }">{{ ageLabel(detail) }}</span>
             <span v-if="detail.resumeId" class="pill">{{ detail.resumeId }}</span>
@@ -215,7 +218,7 @@ export const Board = {
           <h4>JD <button class="link" @click="editJd = !editJd">{{ editJd ? '收起编辑' : '改' }}</button></h4>
           <pre v-if="!editJd" class="jd">{{ detail.jd }}</pre>
           <FieldRow v-else label="" type="textarea" :rows="14" :value="detail.jd || ''"
-            :disabled="state.offline" :save="saveJd" wide />
+            :save="saveJd" wide />
         </section>
       </div>
     </div>`,

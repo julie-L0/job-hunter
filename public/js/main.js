@@ -1,7 +1,7 @@
 // 应用外壳：登录闸门 → 侧边栏 + hash 路由。
 // 各功能页在 views/ 里，一个侧边栏项对应一个文件。
 import { api, token } from "./api.js";
-import { loadAll, loadHealth, state } from "./store.js";
+import { flushOutbox, loadAll, loadHealth, state } from "./store.js";
 import { ConfirmHost } from "./ui.js";
 import { Board } from "./views/board.js";
 import { JobComparison } from "./views/job-comparison.js";
@@ -99,7 +99,11 @@ const App = {
       if (minutes < 60) return `${minutes} 分钟前`;
       return `${Math.round(minutes / 60)} 小时前`;
     });
-    return { state, route, NAV, view, snapshotAge, retry: () => loadAll() };
+    async function retry() {
+      await loadAll();
+      await flushOutbox();
+    }
+    return { state, route, NAV, view, snapshotAge, retry, syncNow: () => flushOutbox() };
   },
   template: `
     <div v-if="!state.ready" class="boot">载入中…</div>
@@ -124,8 +128,13 @@ const App = {
           {{ state.configError }} —— 补到 .env 里再重启 npm run dev。
         </p>
         <p v-if="state.offline" class="banner">
-          离线 · 显示 {{ snapshotAge }}的快照，改动无法保存
+          离线 · 显示 {{ snapshotAge }}的快照，本地改动会在联网后同步
           <button class="link" @click="retry">重试</button>
+        </p>
+        <p v-if="state.outbox.length" class="banner" :class="{ bad: state.syncError && !state.syncing }">
+          {{ state.syncing ? '同步中' : '待同步' }} · {{ state.outbox.length }} 项本地改动
+          <span v-if="state.syncError && !state.syncing">{{ state.syncError }}</span>
+          <button class="link" :disabled="state.syncing" @click="syncNow">立即同步</button>
         </p>
 
         <div class="content" :class="{ busy: state.loading }">
