@@ -149,6 +149,30 @@ export const aiRoutes = [
     },
   },
   {
+    method: "POST",
+    path: "/api/fill-form/self-evaluation",
+    handler: async ({ body }) => {
+      requireBody(body, ["recordId"]);
+      const [{ vars }, experiences] = await Promise.all([
+        buildJobContext(body.recordId, { resumeCode: body.resumeCode }),
+        listRecords("experience"),
+      ]);
+      const prompt = await loadPrompt("fill-form-self-evaluation", {
+        limit: body.limit || "300",
+        jd: vars.jd,
+        resume_content: vars.resume_content,
+        experiences: experienceLibrary(experiences),
+      });
+      const history = [{ role: "user", content: prompt }];
+      const message = await chatCompletion({ messages: history, temperature: 0.6 });
+      return {
+        answer: message.content,
+        history: [...history, { role: "assistant", content: message.content }],
+        mock: Boolean(message.mock),
+      };
+    },
+  },
+  {
     // 多轮改稿：前端把上一轮 history 原样带回来
     method: "POST",
     path: "/api/fill-form/revise",

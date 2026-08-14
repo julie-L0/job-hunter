@@ -553,6 +553,9 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .qhead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .limit { width: 72px; flex: none; }
 .qans { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.self-review-box .dhead { flex-wrap: wrap; }
+.self-review-box .dhead p { margin: 2px 0 0; }
+.self-review-box textarea { width: 100%; }
 
 .form-section {
   margin: 10px 0;

@@ -108,6 +108,7 @@ export const api = {
   fillFormLibrary: () => request("GET", "/api/fill-form/library"),
   splitForm: (rawText) => request("POST", "/api/fill-form/split", { rawText }),
   answerForm: (payload) => request("POST", "/api/fill-form/answer", payload),
+  selfEvaluateForm: (payload) => request("POST", "/api/fill-form/self-evaluation", payload),
   reviseForm: (payload) => request("POST", "/api/fill-form/revise", payload),
   intro: (payload) => request("POST", "/api/intro/generate", payload),
   interviewPrep: (payload) => request("POST", "/api/interview-prep", payload),
