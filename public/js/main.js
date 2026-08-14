@@ -132,7 +132,7 @@ const App = {
           <button class="link" @click="retry">重试</button>
         </p>
         <p v-if="state.outbox.length" class="banner" :class="{ bad: state.syncError && !state.syncing }">
-          {{ state.syncing ? '同步中' : '待同步' }} · {{ state.outbox.length }} 项本地改动
+          {{ state.syncing ? '同步中' : state.outbox.some(item => item.blocked) ? '待处理' : '待同步' }} · {{ state.outbox.length }} 项本地改动
           <span v-if="state.syncError && !state.syncing">{{ state.syncError }}</span>
           <button class="link" :disabled="state.syncing" @click="syncNow">立即同步</button>
         </p>
