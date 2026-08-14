@@ -9,7 +9,8 @@ import {
   state,
   toast,
 } from "../store.js";
-import { FieldRow, ageLabel, ddlLabel, isStale, isUrgent } from "../ui.js";
+import { isWebUrl, siteLinkLabel } from "../site-link.js";
+import { FieldRow, ageLabel, copyText, ddlLabel, isStale, isUrgent } from "../ui.js";
 import { matchesJobSearch } from "../job-search.js";
 import { CompanyLibrary } from "./company-library.js";
 
@@ -89,6 +90,10 @@ export const Board = {
       }
     }
 
+    async function copySiteUrl(value) {
+      if (await copyText(value)) toast("已复制投递入口");
+    }
+
     return {
       state,
       tab,
@@ -107,6 +112,9 @@ export const Board = {
       editJd,
       saveJd,
       toggleStar,
+      copySiteUrl,
+      isWebUrl,
+      siteLinkLabel,
       setCurrentJob,
       isStarredJob,
       ddlLabel,
@@ -222,7 +230,8 @@ export const Board = {
             <span v-else-if="detail.status === '待投'" class="pill" :class="{ warn: isStale(detail) }">{{ ageLabel(detail) }}</span>
             <span v-if="detail.resumeId" class="pill">{{ detail.resumeId }}</span>
             <span class="grow"></span>
-            <a v-if="detail.siteUrl" class="ghost" :href="detail.siteUrl" target="_blank" rel="noreferrer">官网</a>
+            <a v-if="isWebUrl(detail.siteUrl)" class="ghost" :href="detail.siteUrl" target="_blank" rel="noreferrer">{{ siteLinkLabel(detail.siteUrl) }}</a>
+            <button v-else-if="detail.siteUrl" class="ghost" type="button" @click="copySiteUrl(detail.siteUrl)">{{ siteLinkLabel(detail.siteUrl) }}</button>
             <a class="ghost" href="#/job/info">编辑岗位</a>
           </header>
           <dl class="meta">
