@@ -10,6 +10,7 @@ import {
   toast,
 } from "../store.js";
 import { FieldRow, ageLabel, ddlLabel, isStale, isUrgent } from "../ui.js";
+import { matchesJobSearch } from "../job-search.js";
 import { CompanyLibrary } from "./company-library.js";
 
 const { computed, nextTick, ref, watch } = window.Vue;
@@ -37,6 +38,7 @@ export const Board = {
     });
     const showClosed = ref(false);
     const editJd = ref(false);
+    const search = ref("");
     const companyLibrary = ref(null);
 
     async function beginJob() {
@@ -45,12 +47,14 @@ export const Board = {
       companyLibrary.value?.beginJob();
     }
 
-    const inStatus = (status) => byUrgency(state.jobs.filter((job) => job.status === status));
+    const filteredJobs = computed(() => state.jobs.filter((job) => matchesJobSearch(job, search.value)));
+    const searchActive = computed(() => Boolean(search.value.trim()));
+    const inStatus = (status) => byUrgency(filteredJobs.value.filter((job) => job.status === status));
     const tabs = computed(() => ["全部", COMPANY_TAB, ...ACTIVE_STATUSES.value, CLOSED_TAB]);
     const columns = computed(() =>
       ACTIVE_STATUSES.value.map((status) => ({ status, jobs: inStatus(status) })),
     );
-    const closed = computed(() => byUrgency(state.jobs.filter((job) => isClosed(job.status))));
+    const closed = computed(() => byUrgency(filteredJobs.value.filter((job) => isClosed(job.status))));
     const closedSummary = computed(() => {
       const counts = new Map();
       for (const job of closed.value) counts.set(job.status, (counts.get(job.status) || 0) + 1);
@@ -89,6 +93,9 @@ export const Board = {
       state,
       tab,
       tabs,
+      search,
+      searchActive,
+      filteredJobs,
       columns,
       closed,
       closedSummary,
@@ -113,8 +120,16 @@ export const Board = {
   template: `
     <div class="board-page">
       <div class="board-summary">
+        <label class="board-search">
+          <span>搜索</span>
+          <input v-model="search" type="search" placeholder="公司或岗位，支持部分关键词">
+          <button v-if="search" class="link" type="button" @click="search = ''">清除</button>
+        </label>
         <span v-if="state.loading" class="muted">正在加载…</span>
-        <span v-else class="muted">{{ state.companies.length }} 家公司 · {{ state.jobs.length }} 个岗位</span>
+        <span v-else class="muted">
+          {{ state.companies.length }} 家公司 · {{ state.jobs.length }} 个岗位
+          <template v-if="searchActive"> · 命中 {{ filteredJobs.length }} 个</template>
+        </span>
         <button class="primary" :disabled="state.offline || !state.companies.length" @click="beginJob">新建岗位</button>
       </div>
 
@@ -145,7 +160,7 @@ export const Board = {
               <small v-if="job.resumeId" class="muted">{{ job.resumeId }}</small>
               <small v-if="job.pendingSync" class="bad">待同步</small>
             </article>
-            <p v-if="!col.jobs.length" class="colempty">—</p>
+            <p v-if="!col.jobs.length" class="colempty">{{ searchActive ? '无匹配' : '—' }}</p>
           </section>
         </div>
 
@@ -167,7 +182,7 @@ export const Board = {
                 :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
                 @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
             </article>
-            <p v-if="!closed.length" class="muted">还没有结束的岗位。</p>
+            <p v-if="!closed.length" class="muted">{{ searchActive ? '已结束里没有匹配的岗位。' : '还没有结束的岗位。' }}</p>
           </div>
         </section>
       </template>
@@ -175,7 +190,7 @@ export const Board = {
       <div v-else class="quick">
         <aside class="qlist">
           <p v-if="state.loading" class="muted">正在加载岗位…</p>
-          <p v-else-if="!listed.length" class="muted">这个状态下没有岗位。</p>
+          <p v-else-if="!listed.length" class="muted">{{ searchActive ? '这个状态下没有匹配的岗位。' : '这个状态下没有岗位。' }}</p>
           <article v-for="job in listed" :key="job.recordId"
             :class="{ urgent: isUrgent(job), on: detail && job.recordId === detail.recordId, starred: isStarredJob(job) }"
             @click="setCurrentJob(job.recordId)">
