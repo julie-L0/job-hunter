@@ -8,6 +8,8 @@ import { NeedJob, PageJobPicker, confirmDialog, copyText, useDraft } from "../ui
 const { computed, reactive, ref } = window.Vue;
 
 let seq = 0;
+const SELF_REVIEW_QUESTION = "请根据岗位 JD、指定简历和经历库，写一段网申表可用的自我评价/个人优势。要求像候选人本人填写，结合岗位需要的能力和已有经历事实，不要空泛套话。";
+
 const newQuestion = (question = "", limit = null) => ({
   id: `q${Date.now().toString(36)}${seq++}`,
   question,
@@ -197,8 +199,9 @@ export const Forms = {
       selfReviewBusy.value = true;
       error.value = "";
       try {
-        const result = await api.selfEvaluateForm({
+        const result = await api.answerForm({
           recordId: job.value.recordId,
+          question: SELF_REVIEW_QUESTION,
           limit: session.selfReview.limit || "",
         });
         session.selfReview.answer = result.answer;
