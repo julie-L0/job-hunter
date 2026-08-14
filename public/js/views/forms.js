@@ -8,6 +8,8 @@ import { NeedJob, PageJobPicker, confirmDialog, copyText, useDraft } from "../ui
 const { computed, reactive, ref } = window.Vue;
 
 let seq = 0;
+const SELF_REVIEW_QUESTION = "请写一段用于网申表「自我评价」字段的正式书面自述。目标效果是能力画像，而不是岗位匹配证明：概括我的长期兴趣、核心能力、实践经验、做事方式和关注方向；可以自然嵌入相关技术/产品关键词，但不要逐条复述 JD。";
+
 const newQuestion = (question = "", limit = null) => ({
   id: `q${Date.now().toString(36)}${seq++}`,
   question,
@@ -18,6 +20,16 @@ const newQuestion = (question = "", limit = null) => ({
   mock: false,
   revise: "",
 });
+
+function normalizeSelfReview(value = {}) {
+  return {
+    limit: Number(value.limit) || 300,
+    answer: value.answer || "",
+    history: Array.isArray(value.history) ? value.history : [],
+    mock: Boolean(value.mock),
+    revise: value.revise || "",
+  };
+}
 
 function normalizeSection(section) {
   const fields = Array.isArray(section.fields) ? section.fields : [];
@@ -55,6 +67,7 @@ export const Forms = {
     const error = ref("");
     const splitting = ref(false);
     const loadingLibrary = ref(false);
+    const selfReviewBusy = ref(false);
     // 逐题的进行中状态。故意不放进 session：刷新后残留一个 true 会把按钮永久锁死
     const busy = reactive({});
 
@@ -64,6 +77,7 @@ export const Forms = {
       libraryVersion: 0,
       sections: [],
       questions: [],
+      selfReview: normalizeSelfReview(),
       warnings: [],
     });
 
@@ -73,12 +87,13 @@ export const Forms = {
     if (!Array.isArray(session.sections)) session.sections = [];
     if (!Array.isArray(session.questions)) session.questions = [];
     if (!Array.isArray(session.warnings)) session.warnings = [];
+    session.selfReview = normalizeSelfReview(session.selfReview);
 
     const sectionList = computed(() => (Array.isArray(session.sections) ? session.sections : []));
     const questionList = computed(() => (Array.isArray(session.questions) ? session.questions : []));
     const kept = computed(() => questionList.value.filter((q) => q.keep && q.question.trim()));
     const pending = computed(() => kept.value.filter((q) => !q.answer));
-    const anyBusy = computed(() => Object.values(busy).some(Boolean));
+    const anyBusy = computed(() => selfReviewBusy.value || Object.values(busy).some(Boolean));
     const entryCount = computed(() => sectionList.value.reduce((sum, section) => sum + section.entries.length, 0));
 
     async function loadLibrary(force = false) {
@@ -178,6 +193,45 @@ export const Forms = {
         busy[question.id] = false;
       }
     }
+
+    async function generateSelfReview() {
+      if (selfReviewBusy.value) return;
+      selfReviewBusy.value = true;
+      error.value = "";
+      try {
+        const result = await api.answerForm({
+          recordId: job.value.recordId,
+          question: SELF_REVIEW_QUESTION,
+          limit: session.selfReview.limit || "",
+        });
+        session.selfReview.answer = result.answer;
+        session.selfReview.history = result.history;
+        session.selfReview.mock = Boolean(result.mock);
+      } catch (failure) {
+        if (!handleError(failure)) error.value = failure.message;
+      } finally {
+        selfReviewBusy.value = false;
+      }
+    }
+
+    async function reviseSelfReview() {
+      const instruction = session.selfReview.revise.trim();
+      if (!instruction || selfReviewBusy.value || !session.selfReview.history.length) return;
+      selfReviewBusy.value = true;
+      error.value = "";
+      try {
+        const result = await api.reviseForm({ history: session.selfReview.history, instruction });
+        session.selfReview.answer = result.answer;
+        session.selfReview.history = result.history;
+        session.selfReview.revise = "";
+        session.selfReview.mock = Boolean(result.mock);
+      } catch (failure) {
+        if (!handleError(failure)) error.value = failure.message;
+      } finally {
+        selfReviewBusy.value = false;
+      }
+    }
+
     async function reset() {
       const ok = await confirmDialog({
         title: "清空开放题？",
@@ -209,6 +263,7 @@ export const Forms = {
       splitting,
       loadingLibrary,
       busy,
+      selfReviewBusy,
       session,
       sectionList,
       questionList,
@@ -221,6 +276,8 @@ export const Forms = {
       answer,
       answerAll,
       revise,
+      generateSelfReview,
+      reviseSelfReview,
       reset,
       copyText,
       copyEntry,
@@ -238,65 +295,13 @@ export const Forms = {
     <NeedJob v-if="!jobReady" what="网申填表" :job="job" />
     <div v-else class="page">
       <h2 class="ptitle">网申填表 · {{ job.company }} {{ job.position }}</h2>
-      <p class="muted">常见网申的可叠加经历项固定在这里：按经历库整理、最近到最远排序、展开后逐字段复制。
-        只有「为什么投递」「补充说明」这类开放题需要额外粘贴生成。</p>
+      <p class="muted">先处理企业页面里的自定义开放题，再生成自我评价，最后从经历资料架逐条复制经历字段。</p>
 
       <p v-if="error" class="notice bad">{{ error }}</p>
       <p v-for="warning in session.warnings" :key="warning" class="notice bad">{{ warning }}</p>
 
-      <div class="strip">
-        <span class="flabel">固定资料架</span>
-        <span class="muted">{{ sectionList.length }} 个栏目，{{ entryCount }} 条可复制内容，最近时间在前</span>
-        <span v-if="loadingLibrary" class="muted">加载中…</span>
-        <span class="grow"></span>
-        <button class="ghost" :disabled="loadingLibrary || state.offline" @click="loadLibrary(true)">刷新经历库</button>
-      </div>
-
-      <template v-if="sectionList.length">
-        <details v-for="section in sectionList" :key="section.id" class="form-section" :open="section.entries.length > 0">
-          <summary>
-            <span>{{ section.title }}</span>
-            <small>{{ section.entries.length }} 条</small>
-          </summary>
-
-          <div class="dhead">
-            <div>
-              <p class="muted">字段：{{ section.fields.map((field) => field.label).join(' / ') }}</p>
-            </div>
-            <span class="grow"></span>
-            <button class="ghost" :disabled="!section.entries.length" @click="copySection(section)">复制本组</button>
-          </div>
-
-          <p v-if="!section.entries.length" class="notice bad">经历库里暂时没有可用于这个栏目复制的条目。</p>
-
-          <article v-for="entry in section.entries" :key="entry.id" class="fill-entry">
-            <div class="qhead">
-              <strong>{{ entry.sourceTitle }}</strong>
-              <span v-if="entryDate(entry)" class="pill">{{ entryDate(entry) }}</span>
-              <span v-if="entry.missingFields.length" class="pill warn">有字段待补</span>
-              <span class="muted">{{ entry.matchReason }}</span>
-              <span class="grow"></span>
-              <button class="link" @click="copyEntry(section, entry)">复制整条</button>
-            </div>
-
-            <div class="fill-grid">
-              <label v-for="field in section.fields" :key="field.key" class="fill-field"
-                :class="{ missing: !fieldValue(entry, field), wide: field.key === 'description' && !['award', 'certificate', 'needs-confirmation'].includes(section.kind) }">
-                <span>
-                  <b>{{ field.label }}</b>
-                  <button type="button" class="link" @click="copyText(fieldValue(entry, field))">复制</button>
-                </span>
-                <textarea v-if="field.key === 'description' && !['award', 'certificate', 'needs-confirmation'].includes(section.kind)" rows="5" v-model="entry.fields[field.key]"
-                  placeholder="待补充"></textarea>
-                <input v-else v-model="entry.fields[field.key]" placeholder="待补充">
-              </label>
-            </div>
-          </article>
-        </details>
-      </template>
-
       <details class="paste" :open="!questionList.length">
-        <summary>开放题额外粘贴（{{ session.openText.length }} 字）</summary>
+        <summary>自定义问题 / 开放题粘贴（{{ session.openText.length }} 字）</summary>
         <textarea rows="6" v-model="session.openText" :disabled="state.offline"
           placeholder="只粘开放题，例如：为什么选择这个岗位？请描述一次你解决复杂问题的经历。实习/校园/项目经历字段不用粘。"></textarea>
         <div class="drow">
@@ -353,6 +358,91 @@ export const Forms = {
             </div>
           </div>
         </article>
+      </template>
+
+      <section class="draftbox self-review-box">
+        <div class="dhead">
+          <div>
+            <span class="dtitle">自我评价</span>
+            <p class="muted">根据当前 JD、指定简历和经历库综合生成，适合粘到「自我评价 / 个人优势」字段。</p>
+          </div>
+          <span class="grow"></span>
+          <span class="muted">字数上限</span>
+          <input class="limit" type="number" min="80" v-model.number="session.selfReview.limit">
+          <button class="primary" :disabled="selfReviewBusy || state.offline" @click="generateSelfReview">
+            {{ selfReviewBusy ? '生成中…' : (session.selfReview.answer ? '重新生成' : '生成自我评价') }}
+          </button>
+          <span v-if="session.selfReview.mock" class="pill warn">MOCK 占位内容</span>
+        </div>
+
+        <div v-if="session.selfReview.answer" class="qans">
+          <div class="dhead">
+            <span class="dtitle">草稿</span>
+            <span class="grow"></span>
+            <span :class="session.selfReview.limit && session.selfReview.answer.length > session.selfReview.limit ? 'bad' : 'muted'">
+              {{ session.selfReview.answer.length }}{{ session.selfReview.limit ? ' / ' + session.selfReview.limit : '' }} 字
+            </span>
+            <button class="link" @click="copyText(session.selfReview.answer)">复制</button>
+          </div>
+          <textarea rows="7" v-model="session.selfReview.answer"></textarea>
+          <div class="drow">
+            <input v-model="session.selfReview.revise" :disabled="state.offline" @keyup.enter="reviseSelfReview"
+              placeholder="要改哪里：更像本人、更具体、少一点套话……">
+            <button class="ghost" :disabled="selfReviewBusy || state.offline || !session.selfReview.revise.trim() || !session.selfReview.history.length"
+              @click="reviseSelfReview">{{ selfReviewBusy ? '改稿中…' : '让 AI 改' }}</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="strip">
+        <span class="flabel">经历资料架</span>
+        <span class="muted">{{ sectionList.length }} 个栏目，{{ entryCount }} 条可复制内容，最近时间在前</span>
+        <span v-if="loadingLibrary" class="muted">加载中…</span>
+        <span class="grow"></span>
+        <button class="ghost" :disabled="loadingLibrary || state.offline" @click="loadLibrary(true)">刷新经历库</button>
+      </div>
+
+      <template v-if="sectionList.length">
+        <details v-for="section in sectionList" :key="section.id" class="form-section" :open="section.entries.length > 0">
+          <summary>
+            <span>{{ section.title }}</span>
+            <small>{{ section.entries.length }} 条</small>
+          </summary>
+
+          <div class="dhead">
+            <div>
+              <p class="muted">字段：{{ section.fields.map((field) => field.label).join(' / ') }}</p>
+            </div>
+            <span class="grow"></span>
+            <button class="ghost" :disabled="!section.entries.length" @click="copySection(section)">复制本组</button>
+          </div>
+
+          <p v-if="!section.entries.length" class="notice bad">经历库里暂时没有可用于这个栏目复制的条目。</p>
+
+          <article v-for="entry in section.entries" :key="entry.id" class="fill-entry">
+            <div class="qhead">
+              <strong>{{ entry.sourceTitle }}</strong>
+              <span v-if="entryDate(entry)" class="pill">{{ entryDate(entry) }}</span>
+              <span v-if="entry.missingFields.length" class="pill warn">有字段待补</span>
+              <span class="muted">{{ entry.matchReason }}</span>
+              <span class="grow"></span>
+              <button class="link" @click="copyEntry(section, entry)">复制整条</button>
+            </div>
+
+            <div class="fill-grid">
+              <label v-for="field in section.fields" :key="field.key" class="fill-field"
+                :class="{ missing: !fieldValue(entry, field), wide: field.key === 'description' && !['award', 'certificate', 'needs-confirmation'].includes(section.kind) }">
+                <span>
+                  <b>{{ field.label }}</b>
+                  <button type="button" class="link" @click="copyText(fieldValue(entry, field))">复制</button>
+                </span>
+                <textarea v-if="field.key === 'description' && !['award', 'certificate', 'needs-confirmation'].includes(section.kind)" rows="5" v-model="entry.fields[field.key]"
+                  placeholder="待补充"></textarea>
+                <input v-else v-model="entry.fields[field.key]" placeholder="待补充">
+              </label>
+            </div>
+          </article>
+        </details>
       </template>
     </div>`,
 };
