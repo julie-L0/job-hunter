@@ -8,7 +8,7 @@ import { NeedJob, PageJobPicker, confirmDialog, copyText, useDraft } from "../ui
 const { computed, reactive, ref } = window.Vue;
 
 let seq = 0;
-const SELF_REVIEW_QUESTION = "请写一段用于网申「自我评价」字段的候选人自述。不要写成「为什么我符合这个岗位」或逐条证明 JD 匹配；请用第一人称概括我的能力特点、做事方式和可验证经历，JD 只作为选择重点的背景。";
+const SELF_REVIEW_QUESTION = "请写一段用于网申表「自我评价」字段的正式书面自述。不要写成口语聊天、面试回答，或『为什么我符合这个岗位』；请用第一人称概括我的能力特点、做事方式和可验证经历，JD 只作为选择重点的背景。";
 
 const newQuestion = (question = "", limit = null) => ({
   id: `q${Date.now().toString(36)}${seq++}`,
