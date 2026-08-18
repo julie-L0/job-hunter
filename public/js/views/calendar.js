@@ -99,8 +99,10 @@ export const Calendar = {
     }
 
     const selectedJob = computed(() => jobById(form.recordId));
+    const jobSearchActive = computed(() => Boolean(jobQuery.value.trim()));
     const filteredJobOptions = computed(() => {
       const query = jobQuery.value.trim();
+      if (!query) return [];
       const pool = query ? jobs.value.filter((job) => matchesJobSearch(job, query)) : jobs.value;
       return pool.slice(0, 8);
     });
@@ -399,6 +401,7 @@ export const Calendar = {
       jobs,
       jobQuery,
       jobPickerOpen,
+      jobSearchActive,
       selectedJob,
       filteredJobOptions,
       cells,
@@ -525,7 +528,7 @@ export const Calendar = {
                 </div>
                 <input v-model="jobQuery" type="search" placeholder="搜公司或岗位名，支持部分关键词"
                   @focus="jobPickerOpen = true" @input="updateJobQuery">
-                <div v-if="jobPickerOpen" class="calendar-job-options">
+                <div v-if="jobPickerOpen && jobSearchActive" class="calendar-job-options">
                   <button v-for="job in filteredJobOptions" :key="job.recordId" type="button"
                     :class="{ on: job.recordId === form.recordId }" @mousedown.prevent @click="selectJob(job)">
                     <strong>{{ job.company }}</strong>
