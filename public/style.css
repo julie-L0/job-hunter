@@ -636,7 +636,14 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   margin-bottom: 16px;
 }
 .company-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px; align-items: start; }
-.company-list { display: flex; flex-direction: column; gap: 6px; }
+.company-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100vh - 190px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
 .company-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1086,7 +1093,7 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   .calendar-layout, .calendar-form { grid-template-columns: minmax(0, 1fr); }
   .fill-field.wide { grid-column: 1; }
   .company-create { grid-template-columns: minmax(0, 1fr); }
-  .company-list { flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
+  .company-list { flex-direction: row; max-height: none; overflow-x: auto; overflow-y: visible; padding-right: 0; padding-bottom: 4px; }
   .company-card { flex: 0 0 220px; }
   .company-detail { padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--line); }
   .company-form .wide { grid-column: 1; }
