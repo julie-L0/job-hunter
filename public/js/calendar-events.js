@@ -72,6 +72,7 @@ export function normalizeCalendarEvent(input, now = Date.now()) {
   const fallbackTitle = eventTypeLabel(type);
   return {
     id: clean(input?.id) || `calendar:${now}:${Math.random().toString(36).slice(2, 8)}`,
+    clientId: clean(input?.clientId),
     recordId: clean(input?.recordId),
     type,
     title: clean(input?.title) || fallbackTitle,
@@ -83,6 +84,10 @@ export function normalizeCalendarEvent(input, now = Date.now()) {
     createdAt: Number(input?.createdAt || 0) || now,
     updatedAt: now,
   };
+}
+
+export function isLocalCalendarEvent(event) {
+  return String(event?.id || "").startsWith("calendar:");
 }
 
 export function sortCalendarEvents(events) {

@@ -78,9 +78,27 @@ export const SCHEMAS = {
       updatedAt: { name: "更新时间", type: "datetime" },
     },
   },
+
+  calendar: {
+    tableId: () => config.lark.tables.calendar,
+    primary: "title",
+    fields: {
+      title: { name: "标题", type: "text" },
+      jobRecordId: { name: "岗位记录ID", type: "text" },
+      type: { name: "类型", type: "text" },
+      startsAt: { name: "开始时间", type: "datetime" },
+      endsAt: { name: "结束时间", type: "datetime" },
+      targetStatus: { name: "绑定状态", type: "text" },
+      note: { name: "备注", type: "text" },
+      statusAppliedAt: { name: "状态已写回时间", type: "datetime" },
+      clientId: { name: "客户端ID", type: "text" },
+      updatedAt: { name: "更新时间", type: "datetime" },
+    },
+  },
 };
 
 export const JOB_STATUSES = ["待投", "已投", "笔试", "一面", "二面", "三面", "挂", "offer"];
+export const CALENDAR_EVENT_TYPES = ["written", "interview1", "interview2", "interview3", "interview", "deadline", "other"];
 export const JOB_STAR_VALUE = "星标";
 export const RESUME_REQUIRED_STATUSES = new Set(JOB_STATUSES.slice(1));
 export const EXPERIENCE_TYPES = ["实习经历", "项目经历", "校园经历", "荣誉/获奖", "语言/证书", "其他"];

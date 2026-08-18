@@ -87,6 +87,11 @@ export const api = {
   deleteJob: (recordId) => request("DELETE", `/api/jobs/${recordId}`),
   prepDoc: (recordId) => request("POST", `/api/jobs/${recordId}/prep-doc`, {}),
 
+  calendarEvents: () => request("GET", "/api/calendar-events"),
+  createCalendarEvent: (patch) => request("POST", "/api/calendar-events", patch),
+  patchCalendarEvent: (recordId, patch) => request("PATCH", `/api/calendar-events/${recordId}`, patch),
+  deleteCalendarEvent: (recordId) => request("DELETE", `/api/calendar-events/${recordId}`),
+
   resumes: () => request("GET", "/api/resumes"),
   generateResume: (jd) => request("POST", "/api/resumes/generate", { jd }),
   createResume: (patch) => request("POST", "/api/resumes", patch),

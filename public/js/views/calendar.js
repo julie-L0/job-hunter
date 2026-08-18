@@ -7,6 +7,7 @@ import {
   eventTypeLabel,
   eventsForDate,
   formatEventTime,
+  isLocalCalendarEvent,
   localDateTimeMillis,
   markStatusApplied,
   monthCells,
@@ -16,6 +17,7 @@ import {
   splitLocalDateTime,
   todayKey,
 } from "../calendar-events.js";
+import { api } from "../api.js";
 import { calendarEvents } from "../persist.js";
 import {
   currentJobRef,
@@ -27,6 +29,7 @@ import {
   toast,
 } from "../store.js";
 import { confirmDialog } from "../ui.js";
+import { matchesJobSearch } from "../job-search.js";
 
 const { computed, reactive, ref, watch } = window.Vue;
 
@@ -62,7 +65,13 @@ export const Calendar = {
     const currentMonth = ref(monthKeyFromDate(nowKey));
     const selectedDate = ref(nowKey);
     const events = ref(sortCalendarEvents(calendarEvents.load()));
+    const eventsLoading = ref(false);
+    const calendarError = ref("");
+    const backendReady = ref(false);
     const editingId = ref("");
+    const savingEvent = ref(false);
+    const jobQuery = ref("");
+    const jobPickerOpen = ref(false);
     const formError = ref("");
     const form = reactive({
       recordId: "",
@@ -89,9 +98,12 @@ export const Calendar = {
       return state.jobs.find((job) => job.recordId === recordId) || null;
     }
 
-    function selectedJob() {
-      return jobById(form.recordId);
-    }
+    const selectedJob = computed(() => jobById(form.recordId));
+    const filteredJobOptions = computed(() => {
+      const query = jobQuery.value.trim();
+      const pool = query ? jobs.value.filter((job) => matchesJobSearch(job, query)) : jobs.value;
+      return pool.slice(0, 8);
+    });
 
     function autoTitle(type = form.type, recordId = form.recordId) {
       const label = eventTypeLabel(type);
@@ -110,6 +122,46 @@ export const Calendar = {
       calendarEvents.save(events.value);
     }
 
+    function cacheServerEvents(items) {
+      events.value = sortCalendarEvents(items);
+      calendarEvents.save(events.value);
+    }
+
+    function serverPayload(event) {
+      return {
+        ...event,
+        clientId: event.clientId || (isLocalCalendarEvent(event) ? event.id : ""),
+      };
+    }
+
+    async function syncLocalEvents(serverItems) {
+      const serverClientIds = new Set(serverItems.map((event) => event.clientId).filter(Boolean));
+      const localOnly = sortCalendarEvents(calendarEvents.load()).filter((event) =>
+        isLocalCalendarEvent(event) && !serverClientIds.has(event.id),
+      );
+      if (!localOnly.length) return serverItems;
+      const created = [];
+      for (const event of localOnly) created.push(await api.createCalendarEvent(serverPayload(event)));
+      return sortCalendarEvents([...serverItems, ...created]);
+    }
+
+    async function loadEvents() {
+      eventsLoading.value = true;
+      calendarError.value = "";
+      try {
+        const serverItems = sortCalendarEvents(await api.calendarEvents());
+        const merged = await syncLocalEvents(serverItems);
+        cacheServerEvents(merged);
+        backendReady.value = true;
+      } catch (failure) {
+        backendReady.value = false;
+        calendarError.value = failure.message || "日历表暂不可用，先显示本机缓存";
+        handleError(failure);
+      } finally {
+        eventsLoading.value = false;
+      }
+    }
+
     function resetForm(day = selectedDate.value) {
       const recordId = currentJobRef.value?.recordId || state.currentJobId || jobs.value[0]?.recordId || "";
       const type = "interview1";
@@ -126,6 +178,8 @@ export const Calendar = {
         targetStatus: defaultStatusForType(type),
         note: "",
       });
+      jobQuery.value = recordId ? jobLabel(jobById(recordId)) : "";
+      jobPickerOpen.value = false;
     }
 
     function applyTypeDefaults() {
@@ -137,6 +191,28 @@ export const Calendar = {
 
     function applyJobDefault() {
       if (!form.title || titleLooksAuto()) form.title = autoTitle();
+    }
+
+    function selectJob(job) {
+      form.recordId = job?.recordId || "";
+      jobQuery.value = job ? jobLabel(job) : "";
+      jobPickerOpen.value = false;
+      applyJobDefault();
+    }
+
+    function clearJob() {
+      form.recordId = "";
+      jobQuery.value = "";
+      jobPickerOpen.value = true;
+      applyJobDefault();
+    }
+
+    function updateJobQuery() {
+      jobPickerOpen.value = true;
+      if (form.recordId && jobQuery.value.trim() !== jobLabel(selectedJob.value)) {
+        form.recordId = "";
+        applyJobDefault();
+      }
     }
 
     function selectDate(key) {
@@ -175,18 +251,39 @@ export const Calendar = {
       });
     }
 
-    function saveEvent() {
+    async function saveEvent() {
       formError.value = "";
+      savingEvent.value = true;
+      let event = null;
       try {
-        const event = buildEvent();
-        events.value = [...events.value.filter((item) => item.id !== event.id), event];
+        event = buildEvent();
+        let saved = event;
+        if (backendReady.value) {
+          saved = isLocalCalendarEvent(event)
+            ? await api.createCalendarEvent(serverPayload(event))
+            : await api.patchCalendarEvent(event.id, serverPayload(event));
+        } else {
+          calendarError.value = "日历表暂不可用，这条先保存在本机。";
+        }
+        events.value = [...events.value.filter((item) => item.id !== event.id && item.id !== saved.id), saved];
         persistEvents();
-        selectedDate.value = dateKey(event.startsAt);
+        selectedDate.value = dateKey(saved.startsAt);
         currentMonth.value = monthKeyFromDate(selectedDate.value);
         resetForm(selectedDate.value);
-        toast("日程已保存");
+        toast(backendReady.value ? "日程已保存" : "日程已暂存在本机");
       } catch (failure) {
-        formError.value = failure.message || "保存失败";
+        if (event && handleError(failure)) {
+          backendReady.value = false;
+          calendarError.value = "日历表暂不可用，这条先保存在本机。";
+          events.value = [...events.value.filter((item) => item.id !== event.id), event];
+          persistEvents();
+          resetForm(dateKey(event.startsAt));
+          toast("日程已暂存在本机");
+        } else {
+          formError.value = failure.message || "保存失败";
+        }
+      } finally {
+        savingEvent.value = false;
       }
     }
 
@@ -206,19 +303,26 @@ export const Calendar = {
         targetStatus: event.targetStatus || "",
         note: event.note || "",
       });
+      jobQuery.value = event.recordId ? jobLabel(jobById(event.recordId)) : "";
+      jobPickerOpen.value = false;
     }
 
     async function deleteEvent(event) {
       const ok = await confirmDialog({
         title: `删除「${event.title}」？`,
-        body: "只会删除这条本地日历，不会改岗位记录。",
+        body: "只会删除这条日程，不会改岗位记录。",
         danger: true,
       });
       if (!ok) return;
-      events.value = events.value.filter((item) => item.id !== event.id);
-      persistEvents();
-      if (editingId.value === event.id) resetForm(selectedDate.value);
-      toast("日程已删除");
+      try {
+        if (backendReady.value && !isLocalCalendarEvent(event)) await api.deleteCalendarEvent(event.id);
+        events.value = events.value.filter((item) => item.id !== event.id);
+        persistEvents();
+        if (editingId.value === event.id) resetForm(selectedDate.value);
+        toast("日程已删除");
+      } catch (failure) {
+        if (!handleError(failure)) toast(failure.message || "删除失败");
+      }
     }
 
     async function applyStatus(event) {
@@ -230,7 +334,10 @@ export const Calendar = {
       try {
         await saveJobPatch(job.recordId, { status: event.targetStatus });
         const marked = markStatusApplied(event);
-        events.value = events.value.map((item) => item.id === event.id ? marked : item);
+        const saved = backendReady.value && !isLocalCalendarEvent(marked)
+          ? await api.patchCalendarEvent(marked.id, serverPayload(marked))
+          : marked;
+        events.value = events.value.map((item) => item.id === event.id ? saved : item);
         persistEvents();
         toast(`已更新为「${event.targetStatus}」`);
       } catch (failure) {
@@ -278,12 +385,22 @@ export const Calendar = {
     );
 
     resetForm(nowKey);
+    void loadEvents();
 
     return {
       state,
       statuses,
       events,
+      eventsLoading,
+      calendarError,
+      backendReady,
+      savingEvent,
+      loadEvents,
       jobs,
+      jobQuery,
+      jobPickerOpen,
+      selectedJob,
+      filteredJobOptions,
       cells,
       selectedDate,
       selectedEvents,
@@ -305,6 +422,9 @@ export const Calendar = {
       applyStatus,
       applyTypeDefaults,
       applyJobDefault,
+      selectJob,
+      clearJob,
+      updateJobQuery,
       formatEventTime,
       formatAgendaTime,
       eventTypeLabel,
@@ -322,7 +442,7 @@ export const Calendar = {
       <header class="pagehead calendar-head">
         <div>
           <h2 class="ptitle">日历</h2>
-          <p class="muted">面试、笔试截止和其它时间点先保存在本机；到点后可一键写回岗位状态。</p>
+          <p class="muted">面试、笔试截止和其它时间点会同步到飞书日历表；到点后可一键写回岗位状态。</p>
         </div>
         <span class="grow"></span>
         <div class="calendar-nav">
@@ -332,6 +452,12 @@ export const Calendar = {
           <button class="ghost" type="button" @click="goToday">今天</button>
         </div>
       </header>
+
+      <p v-if="calendarError" class="notice bad">
+        {{ calendarError }}
+        <button class="link" type="button" :disabled="eventsLoading" @click="loadEvents">重试加载</button>
+      </p>
+      <p v-else-if="eventsLoading" class="notice">正在加载日历表…</p>
 
       <div class="calendar-layout">
         <section class="calendar-month" aria-label="月视图">
@@ -388,15 +514,27 @@ export const Calendar = {
               <button v-if="editingId" class="link" type="button" @click="resetForm(selectedDate)">取消编辑</button>
             </div>
             <div class="calendar-form">
-              <label>
+              <div class="calendar-job-picker wide">
                 <span>关联岗位</span>
-                <select v-model="form.recordId" @change="applyJobDefault">
-                  <option value="">不关联岗位</option>
-                  <option v-for="job in jobs" :key="job.recordId" :value="job.recordId">
-                    {{ job.company }} · {{ job.position }}
-                  </option>
-                </select>
-              </label>
+                <div v-if="selectedJob" class="calendar-selected-job">
+                  <button class="link" type="button" @click="openJob(selectedJob.recordId)">
+                    {{ selectedJob.company }} · {{ selectedJob.position }}
+                  </button>
+                  <span class="pill">{{ selectedJob.status }}</span>
+                  <button class="link" type="button" @click="clearJob">清除</button>
+                </div>
+                <input v-model="jobQuery" type="search" placeholder="搜公司或岗位名，支持部分关键词"
+                  @focus="jobPickerOpen = true" @input="updateJobQuery">
+                <div v-if="jobPickerOpen" class="calendar-job-options">
+                  <button v-for="job in filteredJobOptions" :key="job.recordId" type="button"
+                    :class="{ on: job.recordId === form.recordId }" @mousedown.prevent @click="selectJob(job)">
+                    <strong>{{ job.company }}</strong>
+                    <span>{{ job.position }}</span>
+                    <small>{{ job.status }}</small>
+                  </button>
+                  <p v-if="!filteredJobOptions.length" class="muted">没有匹配的岗位。</p>
+                </div>
+              </div>
               <label>
                 <span>类型</span>
                 <select v-model="form.type" @change="applyTypeDefaults">
@@ -439,7 +577,9 @@ export const Calendar = {
             </div>
             <p v-if="formError" class="bad">{{ formError }}</p>
             <div class="drow">
-              <button class="primary" type="button" @click="saveEvent">{{ editingId ? '保存修改' : '加入日历' }}</button>
+              <button class="primary" type="button" :disabled="savingEvent" @click="saveEvent">
+                {{ savingEvent ? '保存中…' : editingId ? '保存修改' : '加入日历' }}
+              </button>
               <button class="ghost" type="button" @click="resetForm(selectedDate)">重置</button>
             </div>
           </section>
