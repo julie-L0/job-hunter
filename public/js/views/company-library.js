@@ -54,10 +54,16 @@ export const CompanyLibrary = {
         })
       : [],
     );
-    const counts = computed(() => new Map(
+    const companyProgress = computed(() => new Map(
       state.companies.map((company) => [
         company.recordId,
-        state.jobs.filter((job) => job.companyId === company.recordId).length,
+        (() => {
+          const jobs = state.jobs.filter((job) => job.companyId === company.recordId);
+          const pending = jobs.filter((job) => job.status === "待投").length;
+          if (!jobs.length) return { total: 0, pending: 0, tone: "empty", label: "未建岗位" };
+          if (pending) return { total: jobs.length, pending, tone: "pending", label: `待投 ${pending}` };
+          return { total: jobs.length, pending: 0, tone: "done", label: "已投完" };
+        })(),
       ]),
     ));
     const needsResume = computed(() => statusRequiresResume(jobForm.status));
@@ -228,7 +234,7 @@ export const CompanyLibrary = {
       companies,
       selected,
       companyJobs,
-      counts,
+      companyProgress,
       statuses,
       resumeCodes,
       needsResume,
@@ -270,10 +276,13 @@ export const CompanyLibrary = {
       <div v-else class="company-layout">
         <aside class="company-list">
           <button v-for="company in companies" :key="company.recordId"
-            :class="['company-card', { on: selected && selected.recordId === company.recordId }]"
+            :class="['company-card', companyProgress.get(company.recordId)?.tone, { on: selected && selected.recordId === company.recordId }]"
             @click="selectCompany(company.recordId)">
             <strong>{{ company.name }}</strong>
-            <span>{{ counts.get(company.recordId) || 0 }} 个岗位</span>
+            <span class="company-progress" :class="companyProgress.get(company.recordId)?.tone">
+              {{ companyProgress.get(company.recordId)?.label }}
+            </span>
+            <span>{{ companyProgress.get(company.recordId)?.total || 0 }} 个岗位</span>
             <small v-if="company.siteUrl">{{ company.siteUrl }}</small>
           </button>
           <p v-if="!companies.length && !state.loading" class="muted">公司库为空。</p>
