@@ -650,6 +650,7 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 }
 .company-card:hover { border-color: var(--line-on); background: #f4f3f0; }
 .company-card.on { border-color: var(--accent-line); background: rgba(47, 111, 79, 0.07); }
+.company-card.todo { border-left: 4px solid var(--accent); }
 .company-card strong { overflow-wrap: anywhere; }
 .company-card span { color: var(--dim); font-size: 12px; }
 .company-progress {
