@@ -60,8 +60,7 @@ export const CompanyLibrary = {
         (() => {
           const jobs = state.jobs.filter((job) => job.companyId === company.recordId);
           const pending = jobs.filter((job) => job.status === "待投").length;
-          if (!jobs.length) return { total: 0, pending: 0, tone: "empty", label: "未建岗位" };
-          if (pending) return { total: jobs.length, pending, tone: "pending", label: `待投 ${pending}` };
+          if (!jobs.length || pending) return { total: jobs.length, pending, tone: "todo", label: "未投完" };
           return { total: jobs.length, pending: 0, tone: "done", label: "已投完" };
         })(),
       ]),
