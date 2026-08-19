@@ -225,6 +225,8 @@ function cleanedPatch(patch) {
   return Object.fromEntries(Object.entries(patch || {}).filter(([, value]) => value !== undefined));
 }
 
+const syncingOutboxIds = new Set();
+
 function enqueueJobPatch(recordId, patch, statusChange = null) {
   const now = Date.now();
   const items = mergeOutboxItem(
@@ -242,6 +244,7 @@ function enqueueJobPatch(recordId, patch, statusChange = null) {
       blocked: false,
     },
     statusRequiresResume,
+    { lockedIds: syncingOutboxIds },
   );
   persistOutbox(items);
   repairOutbox();
@@ -292,13 +295,18 @@ async function syncOutboxItem(item) {
   const job = state.jobs.find((candidate) => candidate.recordId === item.recordId);
   const payload = ensureRequiredResume(item.patch, { ...job, ...item.patch }, statusRequiresResume);
   if (item.statusChange) payload.statusChangedAt = item.statusChange.at;
-  const result = await api.patchJob(item.recordId, payload);
-  const remaining = state.outbox.filter((candidate) => candidate.id !== item.id);
-  persistOutbox(remaining);
-  mergeJob(result.job);
-  applyQueuedJobPatches();
-  saveSnapshot();
-  if (result.warning) toast(result.warning);
+  syncingOutboxIds.add(item.id);
+  try {
+    const result = await api.patchJob(item.recordId, payload);
+    const remaining = state.outbox.filter((candidate) => candidate.id !== item.id);
+    persistOutbox(remaining);
+    mergeJob(result.job);
+    applyQueuedJobPatches();
+    saveSnapshot();
+    if (result.warning) toast(result.warning);
+  } finally {
+    syncingOutboxIds.delete(item.id);
+  }
 }
 
 export async function flushOutbox() {

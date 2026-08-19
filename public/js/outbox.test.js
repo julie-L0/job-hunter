@@ -37,6 +37,50 @@ test("resume patch merges into a blocked status change", () => {
   assert.equal(merged[0].blocked, false);
 });
 
+test("latest same-job patch can clear a field", () => {
+  const merged = mergeOutboxItem([{
+    id: "star-1",
+    kind: "job.patch",
+    recordId: "job-1",
+    patch: { starred: "星标" },
+    statusChange: null,
+    updatedAt: 1,
+  }], {
+    id: "star-2",
+    kind: "job.patch",
+    recordId: "job-1",
+    patch: { starred: "" },
+    statusChange: null,
+    updatedAt: 2,
+  }, requiresResume);
+
+  assert.equal(merged.length, 1);
+  assert.deepEqual(merged[0].patch, { starred: "" });
+  assert.equal(merged[0].updatedAt, 2);
+});
+
+test("syncing items are not merge targets for later local changes", () => {
+  const merged = mergeOutboxItem([{
+    id: "star-1",
+    kind: "job.patch",
+    recordId: "job-1",
+    patch: { starred: "星标" },
+    statusChange: null,
+    updatedAt: 1,
+  }], {
+    id: "star-2",
+    kind: "job.patch",
+    recordId: "job-1",
+    patch: { starred: "" },
+    statusChange: null,
+    updatedAt: 2,
+  }, requiresResume, { lockedIds: new Set(["star-1"]) });
+
+  assert.equal(merged.length, 2);
+  assert.deepEqual(merged[0].patch, { starred: "星标" });
+  assert.deepEqual(merged[1].patch, { starred: "" });
+});
+
 test("repair copies a later resume patch into an earlier required status patch", () => {
   const result = repairOutboxItems([
     { id: "status-1", kind: "job.patch", recordId: "job-1", patch: { status: "已投" }, statusChange: { to: "已投" } },
