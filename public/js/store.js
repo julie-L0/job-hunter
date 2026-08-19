@@ -95,19 +95,31 @@ function pendingForJob(recordId) {
   return state.outbox.some((item) => item.kind === "job.patch" && item.recordId === recordId);
 }
 
-function applyQueuedJobPatches() {
-  repairOutbox();
+function applyQueuedPatchesToJob(job) {
+  let next = { ...job, pendingSync: pendingForJob(job.recordId) };
   for (const item of state.outbox) {
-    if (item.kind !== "job.patch") continue;
-    const index = state.jobs.findIndex((job) => job.recordId === item.recordId);
-    if (index < 0) continue;
+    if (item.kind !== "job.patch" || item.recordId !== job.recordId) continue;
     const localPatch = item.statusChange
       ? {
         ...item.patch,
-        statusHistory: appendStatusHistory(state.jobs[index].statusHistory, item.statusChange),
+        statusHistory: appendStatusHistory(next.statusHistory, item.statusChange),
       }
       : item.patch;
-    state.jobs[index] = { ...state.jobs[index], ...localPatch, pendingSync: true };
+    next = { ...next, ...localPatch, pendingSync: true };
+  }
+  return next;
+}
+
+function applyQueuedJobPatches() {
+  repairOutbox();
+  const touched = new Set();
+  for (const item of state.outbox) {
+    if (item.kind !== "job.patch") continue;
+    if (touched.has(item.recordId)) continue;
+    touched.add(item.recordId);
+    const index = state.jobs.findIndex((job) => job.recordId === item.recordId);
+    if (index < 0) continue;
+    state.jobs[index] = applyQueuedPatchesToJob(state.jobs[index]);
   }
 }
 
@@ -214,8 +226,10 @@ export function dropCompany(recordId) {
 
 /** 单条岗位改完后就地替换，不重拉整表。 */
 export function mergeJob(job) {
+  if (!job?.recordId || deletedJobIds.has(job.recordId)) return;
   const index = state.jobs.findIndex((item) => item.recordId === job.recordId);
-  const next = { ...job, pendingSync: pendingForJob(job.recordId) };
+  const base = index >= 0 ? { ...state.jobs[index], ...job } : job;
+  const next = applyQueuedPatchesToJob(base);
   if (index >= 0) state.jobs[index] = { ...state.jobs[index], ...next };
   else state.jobs.push(next);
   saveSnapshot();
@@ -226,6 +240,7 @@ function cleanedPatch(patch) {
 }
 
 const syncingOutboxIds = new Set();
+const deletedJobIds = new Set();
 
 function enqueueJobPatch(recordId, patch, statusChange = null) {
   const now = Date.now();
@@ -367,6 +382,7 @@ export function dropExperience(recordId) {
 }
 
 export function dropJob(recordId) {
+  deletedJobIds.add(recordId);
   state.jobs = state.jobs.filter((job) => job.recordId !== recordId);
   if (state.currentJobId === recordId) setCurrentJob(null);
   persistOutbox(state.outbox.filter((item) => item.recordId !== recordId));
