@@ -20,17 +20,20 @@ export function ensureRequiredResume(patch, nextJob, statusRequiresResume) {
   return next;
 }
 
-export function mergeOutboxItem(items, entry, statusRequiresResume) {
+export function mergeOutboxItem(items, entry, statusRequiresResume, options = {}) {
+  const lockedIds = new Set(options.lockedIds || []);
   const next = items.map((item) => ({
     ...item,
     patch: { ...(item.patch || {}) },
     statusChange: item.statusChange ? { ...item.statusChange } : item.statusChange,
   }));
+  const canMergeInto = (item) => !lockedIds.has(item.id);
   let target = null;
 
   if (!entry.statusChange && "resumeId" in entry.patch) {
     target = [...next].reverse().find((item) =>
       item.kind === "job.patch" &&
+      canMergeInto(item) &&
       item.recordId === entry.recordId &&
       needsResume(item.patch?.status, statusRequiresResume) &&
       !clean(item.patch?.resumeId),
@@ -39,7 +42,11 @@ export function mergeOutboxItem(items, entry, statusRequiresResume) {
 
   if (!target && !entry.statusChange) {
     target = [...next].reverse().find((item) =>
-      item.kind === "job.patch" && item.recordId === entry.recordId && !item.statusChange && !item.blocked,
+      item.kind === "job.patch" &&
+      canMergeInto(item) &&
+      item.recordId === entry.recordId &&
+      !item.statusChange &&
+      !item.blocked,
     );
   }
 
