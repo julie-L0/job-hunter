@@ -316,7 +316,6 @@ async function syncOutboxItem(item) {
     const remaining = state.outbox.filter((candidate) => candidate.id !== item.id);
     persistOutbox(remaining);
     mergeJob(result.job);
-    applyQueuedJobPatches();
     saveSnapshot();
     if (result.warning) toast(result.warning);
   } finally {
