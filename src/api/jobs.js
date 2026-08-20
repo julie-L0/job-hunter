@@ -14,7 +14,7 @@ import {
 } from "../storage/schema.js";
 import { getCompany, getJob, hydrateJob, listJobs } from "../services/companies.js";
 import { recomputeApplyRecords } from "../services/resume.js";
-import { appendStatusHistory } from "../services/status-history.js";
+import { applyStatusHistoryChange } from "../services/status-history.js";
 import { createPrepDoc } from "../services/prep-doc.js";
 
 const JOB_PATCH_FIELDS = new Set([
@@ -131,7 +131,7 @@ export const jobRoutes = [
       const patch = pickPatch(body);
       const company = await validateJob({ ...current, ...patch });
       if ("status" in patch && patch.status !== current.status) {
-        patch.statusHistory = appendStatusHistory(current.statusHistory, {
+        patch.statusHistory = applyStatusHistoryChange(current.statusHistory, {
           at: body.statusChangedAt,
           from: current.status,
           to: patch.status,

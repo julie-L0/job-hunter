@@ -61,6 +61,33 @@ test("mergeJob keeps queued local patches over older backend responses", () => {
   assert.equal(state.jobs[0].pendingSync, true);
 });
 
+test("mergeJob replays queued reverse status changes by removing the latest history entry", () => {
+  resetStore();
+  state.jobs = [{ recordId: "job-status", company: "示例公司", position: "产品经理", status: "已投", statusHistory: "" }];
+  state.outbox = [
+    {
+      id: "to-written",
+      kind: "job.patch",
+      recordId: "job-status",
+      patch: { status: "笔试" },
+      statusChange: { at: 1, from: "已投", to: "笔试", resumeId: "R1" },
+    },
+    {
+      id: "back-to-applied",
+      kind: "job.patch",
+      recordId: "job-status",
+      patch: { status: "已投" },
+      statusChange: { at: 2, from: "笔试", to: "已投", resumeId: "R1" },
+    },
+  ];
+
+  mergeJob({ recordId: "job-status", status: "已投", statusHistory: "" });
+
+  assert.equal(state.jobs[0].status, "已投");
+  assert.deepEqual(JSON.parse(state.jobs[0].statusHistory), []);
+  assert.equal(state.jobs[0].pendingSync, true);
+});
+
 test("mergeJob ignores stale responses for a deleted job", () => {
   resetStore();
   state.jobs = [{ recordId: "job-deleted", company: "示例公司", position: "产品经理" }];

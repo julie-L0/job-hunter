@@ -4,7 +4,7 @@
 import { AuthError, ConfigError, NetError, api, token } from "./api.js";
 import { ensureRequiredResume, mergeOutboxItem, repairOutboxItems } from "./outbox.js";
 import { currentJob, outbox, snapshot } from "./persist.js";
-import { appendStatusHistory } from "./status-history.js";
+import { applyStatusHistoryChange } from "./status-history.js";
 
 const { reactive, computed } = window.Vue;
 
@@ -102,7 +102,7 @@ function applyQueuedPatchesToJob(job) {
     const localPatch = item.statusChange
       ? {
         ...item.patch,
-        statusHistory: appendStatusHistory(next.statusHistory, item.statusChange),
+        statusHistory: applyStatusHistoryChange(next.statusHistory, item.statusChange),
       }
       : item.patch;
     next = { ...next, ...localPatch, pendingSync: true };
@@ -285,7 +285,7 @@ export async function saveJobPatch(recordId, patch) {
     }
     : null;
   const localPatch = statusChange
-    ? { ...cleanPatch, statusHistory: appendStatusHistory(current.statusHistory, statusChange) }
+    ? { ...cleanPatch, statusHistory: applyStatusHistoryChange(current.statusHistory, statusChange) }
     : cleanPatch;
 
   enqueueJobPatch(recordId, cleanPatch, statusChange);
