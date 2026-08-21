@@ -447,6 +447,14 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 /* ---- 看板：全部视图 ---- */
 
 .cols { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.col {
+  min-height: 96px;
+  padding: 6px;
+  border: 1px dashed transparent;
+  border-radius: var(--r);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.col.drag-over { background: var(--accent-soft); border-color: var(--accent-line); }
 .col h3 { display: flex; align-items: baseline; gap: 6px; font-size: 12px; font-weight: 500; color: var(--dim); margin: 0 0 8px; }
 .col h3 em { font-style: normal; color: var(--ink); }
 .colempty { margin: 0; font-size: 13px; color: #c9c5be; }
@@ -464,6 +472,7 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   cursor: pointer;
 }
 .col article:hover, .qlist article:hover { border-color: var(--line-on); }
+.col article.dragging { opacity: 0.56; }
 .col article.on, .qlist article.on { border-left-color: var(--accent); background: var(--accent-soft); }
 .col article.urgent, .qlist article.urgent { border-left-color: var(--warn); }
 .col article.starred, .qlist article.starred { border-top-color: #ead9a5; }

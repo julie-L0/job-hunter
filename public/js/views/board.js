@@ -41,6 +41,8 @@ export const Board = {
     const editJd = ref(false);
     const search = ref("");
     const companyLibrary = ref(null);
+    const draggingId = ref("");
+    const dragOverStatus = ref("");
 
     async function beginJob() {
       tab.value = COMPANY_TAB;
@@ -90,6 +92,37 @@ export const Board = {
       }
     }
 
+    function beginDrag(job, event) {
+      if (!job?.recordId) return;
+      draggingId.value = job.recordId;
+      setCurrentJob(job.recordId);
+      if (event?.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", job.recordId);
+      }
+    }
+
+    function endDrag() {
+      draggingId.value = "";
+      dragOverStatus.value = "";
+    }
+
+    async function dropOnStatus(status, event) {
+      event?.preventDefault();
+      const recordId = event?.dataTransfer?.getData("text/plain") || draggingId.value;
+      endDrag();
+      const job = state.jobs.find((item) => item.recordId === recordId);
+      if (!job || !status) return;
+      setCurrentJob(recordId);
+      if (job.status === status) return;
+      try {
+        await saveJobPatch(recordId, { status });
+        toast(`已移动到「${status}」`);
+      } catch (failure) {
+        if (!handleError(failure)) toast(failure.message || "移动失败");
+      }
+    }
+
     async function copySiteUrl(value) {
       if (await copyText(value)) toast("已复制投递入口");
     }
@@ -112,6 +145,11 @@ export const Board = {
       editJd,
       saveJd,
       toggleStar,
+      beginDrag,
+      endDrag,
+      dropOnStatus,
+      draggingId,
+      dragOverStatus,
       copySiteUrl,
       isWebUrl,
       siteLinkLabel,
@@ -151,15 +189,23 @@ export const Board = {
 
       <template v-else-if="tab === '全部'">
         <div class="cols">
-          <section v-for="col in columns" :key="col.status" class="col">
+          <section v-for="col in columns" :key="col.status" class="col"
+            :class="{ 'drag-over': dragOverStatus === col.status }"
+            @dragenter.prevent="dragOverStatus = col.status"
+            @dragover.prevent="dragOverStatus = col.status"
+            @drop="dropOnStatus(col.status, $event)">
             <h3>{{ col.status }} <em>{{ col.jobs.length }}</em></h3>
             <article v-for="job in col.jobs" :key="job.recordId"
-              :class="{ urgent: isUrgent(job), on: job.recordId === state.currentJobId, starred: isStarredJob(job) }"
+              draggable="true"
+              :class="{ urgent: isUrgent(job), on: job.recordId === state.currentJobId, starred: isStarredJob(job), dragging: draggingId === job.recordId }"
+              @dragstart="beginDrag(job, $event)"
+              @dragend="endDrag"
               @click="setCurrentJob(job.recordId)">
               <div class="job-card-head">
                 <strong>{{ job.company }}</strong>
                 <button class="star-button compact" :class="{ on: isStarredJob(job) }"
                   :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
+                  draggable="false"
                   @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
               </div>
               <span class="pos">{{ job.position }}</span>
