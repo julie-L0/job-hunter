@@ -9,6 +9,7 @@ import { resumeRoutes } from "./resumes.js";
 import { experienceRoutes } from "./experiences.js";
 import { aiRoutes } from "./ai.js";
 import { preferenceRoutes } from "./preferences.js";
+import { calendarEventRoutes } from "./calendar-events.js";
 
 const systemRoutes = [
   {
@@ -48,6 +49,7 @@ export const routes = [
   ...resumeRoutes,
   ...experienceRoutes,
   ...preferenceRoutes,
+  ...calendarEventRoutes,
   ...aiRoutes,
 ];
 

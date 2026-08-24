@@ -1,4 +1,5 @@
 import { api } from "../api.js";
+import { isWebUrl, siteLinkLabel } from "../site-link.js";
 import { formatStatusTime, parseStatusHistory, statusHistoryLabel } from "../status-history.js";
 import {
   JOB_STAR_VALUE,
@@ -15,7 +16,7 @@ import {
   statuses,
   toast,
 } from "../store.js";
-import { FieldRow, confirmDialog, dayStr } from "../ui.js";
+import { FieldRow, confirmDialog, copyText, dayStr } from "../ui.js";
 
 const { computed, ref } = window.Vue;
 
@@ -53,6 +54,10 @@ export const JobInfo = {
       } catch (failure) {
         if (!handleError(failure)) toast(failure.message);
       }
+    }
+
+    async function copySiteUrl(value) {
+      if (await copyText(value)) toast("已复制投递入口");
     }
 
     async function createDoc() {
@@ -119,6 +124,9 @@ export const JobInfo = {
       resumeHint,
       save,
       toggleStar,
+      copySiteUrl,
+      isWebUrl,
+      siteLinkLabel,
       isStarredJob,
       orNull,
       dayStr,
@@ -138,7 +146,8 @@ export const JobInfo = {
       <header class="pagehead">
         <div>
           <h2 class="ptitle">{{ job.company }} · {{ job.position }}</h2>
-          <a v-if="job.siteUrl" :href="job.siteUrl" target="_blank" rel="noreferrer">官网</a>
+          <a v-if="isWebUrl(job.siteUrl)" :href="job.siteUrl" target="_blank" rel="noreferrer">{{ siteLinkLabel(job.siteUrl) }}</a>
+          <button v-else-if="job.siteUrl" class="link" type="button" @click="copySiteUrl(job.siteUrl)">{{ siteLinkLabel(job.siteUrl) }}</button>
         </div>
         <span class="grow"></span>
         <button class="star-button star-button-label" :class="{ on: isStarredJob(job) }"

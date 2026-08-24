@@ -2,8 +2,9 @@
 // 降级的核心约定：飞书不通时不清空已有数据，用 localStorage 快照继续渲染，岗位改动先进 outbox。
 // 「看不到今天要投哪几个」比「看到的是 8 分钟前的」严重得多。
 import { AuthError, ConfigError, NetError, api, token } from "./api.js";
+import { ensureRequiredResume, mergeOutboxItem, repairOutboxItems } from "./outbox.js";
 import { currentJob, outbox, snapshot } from "./persist.js";
-import { appendStatusHistory } from "./status-history.js";
+import { applyStatusHistoryChange } from "./status-history.js";
 
 const { reactive, computed } = window.Vue;
 
@@ -83,22 +84,42 @@ function persistOutbox(items) {
   outbox.save(state.outbox);
 }
 
+function repairOutbox() {
+  const result = repairOutboxItems(state.outbox, state.jobs, statusRequiresResume);
+  if (result.changed) persistOutbox(result.items);
+  state.syncError = result.firstBlockedError;
+  return result;
+}
+
 function pendingForJob(recordId) {
   return state.outbox.some((item) => item.kind === "job.patch" && item.recordId === recordId);
 }
 
-function applyQueuedJobPatches() {
+function applyQueuedPatchesToJob(job) {
+  let next = { ...job, pendingSync: pendingForJob(job.recordId) };
   for (const item of state.outbox) {
-    if (item.kind !== "job.patch") continue;
-    const index = state.jobs.findIndex((job) => job.recordId === item.recordId);
-    if (index < 0) continue;
+    if (item.kind !== "job.patch" || item.recordId !== job.recordId) continue;
     const localPatch = item.statusChange
       ? {
         ...item.patch,
-        statusHistory: appendStatusHistory(state.jobs[index].statusHistory, item.statusChange),
+        statusHistory: applyStatusHistoryChange(next.statusHistory, item.statusChange),
       }
       : item.patch;
-    state.jobs[index] = { ...state.jobs[index], ...localPatch, pendingSync: true };
+    next = { ...next, ...localPatch, pendingSync: true };
+  }
+  return next;
+}
+
+function applyQueuedJobPatches() {
+  repairOutbox();
+  const touched = new Set();
+  for (const item of state.outbox) {
+    if (item.kind !== "job.patch") continue;
+    if (touched.has(item.recordId)) continue;
+    touched.add(item.recordId);
+    const index = state.jobs.findIndex((job) => job.recordId === item.recordId);
+    if (index < 0) continue;
+    state.jobs[index] = applyQueuedPatchesToJob(state.jobs[index]);
   }
 }
 
@@ -205,8 +226,10 @@ export function dropCompany(recordId) {
 
 /** 单条岗位改完后就地替换，不重拉整表。 */
 export function mergeJob(job) {
+  if (!job?.recordId || deletedJobIds.has(job.recordId)) return;
   const index = state.jobs.findIndex((item) => item.recordId === job.recordId);
-  const next = { ...job, pendingSync: pendingForJob(job.recordId) };
+  const base = index >= 0 ? { ...state.jobs[index], ...job } : job;
+  const next = applyQueuedPatchesToJob(base);
   if (index >= 0) state.jobs[index] = { ...state.jobs[index], ...next };
   else state.jobs.push(next);
   saveSnapshot();
@@ -216,21 +239,14 @@ function cleanedPatch(patch) {
   return Object.fromEntries(Object.entries(patch || {}).filter(([, value]) => value !== undefined));
 }
 
+const syncingOutboxIds = new Set();
+const deletedJobIds = new Set();
+
 function enqueueJobPatch(recordId, patch, statusChange = null) {
   const now = Date.now();
-  const items = [...state.outbox];
-  let target = null;
-  if (!statusChange) {
-    target = [...items].reverse().find(
-      (item) => item.kind === "job.patch" && item.recordId === recordId && !item.statusChange,
-    );
-  }
-  if (target) {
-    target.patch = { ...target.patch, ...patch };
-    target.updatedAt = now;
-    target.error = "";
-  } else {
-    items.push({
+  const items = mergeOutboxItem(
+    state.outbox,
+    {
       id: `job.patch:${recordId}:${now}:${Math.random().toString(36).slice(2, 8)}`,
       kind: "job.patch",
       recordId,
@@ -240,15 +256,19 @@ function enqueueJobPatch(recordId, patch, statusChange = null) {
       updatedAt: now,
       attempts: 0,
       error: "",
-    });
-  }
+      blocked: false,
+    },
+    statusRequiresResume,
+    { lockedIds: syncingOutboxIds },
+  );
   persistOutbox(items);
+  repairOutbox();
 }
 
 export async function saveJobPatch(recordId, patch) {
   const current = state.jobs.find((item) => item.recordId === recordId);
   if (!current) throw new Error("岗位不存在，请刷新后重试");
-  const cleanPatch = cleanedPatch(patch);
+  const cleanPatch = ensureRequiredResume(cleanedPatch(patch), { ...current, ...patch }, statusRequiresResume);
   if (!Object.keys(cleanPatch).length) return { queued: false };
 
   const next = { ...current, ...cleanPatch };
@@ -265,7 +285,7 @@ export async function saveJobPatch(recordId, patch) {
     }
     : null;
   const localPatch = statusChange
-    ? { ...cleanPatch, statusHistory: appendStatusHistory(current.statusHistory, statusChange) }
+    ? { ...cleanPatch, statusHistory: applyStatusHistoryChange(current.statusHistory, statusChange) }
     : cleanPatch;
 
   enqueueJobPatch(recordId, cleanPatch, statusChange);
@@ -277,7 +297,7 @@ export async function saveJobPatch(recordId, patch) {
 let syncTimer = null;
 
 export function scheduleOutboxSync(delay = 0) {
-  if (!state.outbox.length) return;
+  if (!state.outbox.some((item) => !item.blocked)) return;
   if (syncTimer) clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {
     syncTimer = null;
@@ -287,24 +307,34 @@ export function scheduleOutboxSync(delay = 0) {
 
 async function syncOutboxItem(item) {
   if (item.kind !== "job.patch") throw new Error(`未知同步任务：${item.kind}`);
-  const payload = { ...item.patch };
+  const job = state.jobs.find((candidate) => candidate.recordId === item.recordId);
+  const payload = ensureRequiredResume(item.patch, { ...job, ...item.patch }, statusRequiresResume);
   if (item.statusChange) payload.statusChangedAt = item.statusChange.at;
-  const result = await api.patchJob(item.recordId, payload);
-  const remaining = state.outbox.filter((candidate) => candidate.id !== item.id);
-  persistOutbox(remaining);
-  mergeJob(result.job);
-  applyQueuedJobPatches();
-  saveSnapshot();
-  if (result.warning) toast(result.warning);
+  syncingOutboxIds.add(item.id);
+  try {
+    const result = await api.patchJob(item.recordId, payload);
+    const remaining = state.outbox.filter((candidate) => candidate.id !== item.id);
+    persistOutbox(remaining);
+    mergeJob(result.job);
+    saveSnapshot();
+    if (result.warning) toast(result.warning);
+  } finally {
+    syncingOutboxIds.delete(item.id);
+  }
 }
 
 export async function flushOutbox() {
   if (state.syncing || !state.outbox.length || !state.authed) return;
   state.syncing = true;
+  repairOutbox();
+  if (!state.outbox.some((item) => !item.blocked)) {
+    state.syncing = false;
+    return;
+  }
   state.syncError = "";
   try {
-    while (state.outbox.length) {
-      const item = state.outbox[0];
+    while (state.outbox.some((item) => !item.blocked)) {
+      const item = state.outbox.find((candidate) => !candidate.blocked);
       try {
         await syncOutboxItem(item);
         state.offline = false;
@@ -315,14 +345,19 @@ export async function flushOutbox() {
           failed.attempts = (failed.attempts || 0) + 1;
           failed.error = error.message || "同步失败";
           failed.updatedAt = Date.now();
+          failed.blocked = !(error instanceof NetError);
           persistOutbox(items);
         }
-        if (error instanceof NetError) state.offline = true;
-        else handleError(error);
+        if (error instanceof NetError) {
+          state.offline = true;
+          state.syncError = error.message || "同步失败";
+          break;
+        }
+        handleError(error);
         state.syncError = error.message || "同步失败";
-        break;
       }
     }
+    repairOutbox();
   } finally {
     state.syncing = false;
   }
@@ -346,6 +381,7 @@ export function dropExperience(recordId) {
 }
 
 export function dropJob(recordId) {
+  deletedJobIds.add(recordId);
   state.jobs = state.jobs.filter((job) => job.recordId !== recordId);
   if (state.currentJobId === recordId) setCurrentJob(null);
   persistOutbox(state.outbox.filter((item) => item.recordId !== recordId));

@@ -56,12 +56,13 @@ npm test
 ## 连接自己的飞书数据
 
 1. 创建飞书企业自建应用，并开通 Bitable、Docx 和 Drive 所需权限。
-2. 创建一个飞书多维表格，准备 `company`、`main`、`experience`、`resume` 四张表；偏好表可由迁移脚本创建。
+2. 创建一个飞书多维表格，准备 `company`、`main`、`experience`、`resume` 四张表；偏好表和日历表可由迁移脚本创建。
 3. 将飞书应用添加为该多维表格的协作者。
 4. 以 `.env.example` 为模板创建本地 `.env`，填写自己的应用凭证、Base token 和已有表的 table ID。
 5. 运行 `npm run migrate-preferences -- --yes --write-env` 创建偏好设置表并写入 `BITABLE_TABLE_PREFERENCE`。
-6. 运行检查，确认字段名和字段类型与代码契约一致。
-7. 启动本地服务。
+6. 运行 `npm run migrate-calendar -- --yes --write-env` 创建日历表并写入 `BITABLE_TABLE_CALENDAR`。
+7. 运行检查，确认字段名和字段类型与代码契约一致。
+8. 启动本地服务。
 
 ```bash
 npm run check
@@ -113,6 +114,7 @@ npm run check                # 检查环境和飞书表结构
 npm run migrate-companies    # 旧数据迁移 dry-run
 npm run migrate-experiences  # 经历库旧字段迁移 dry-run
 npm run migrate-preferences  # 偏好设置表 dry-run
+npm run migrate-calendar      # 日历表 dry-run
 ```
 
-`migrate-companies` 默认只分析，不写入；只有显式增加 `--apply` 才会修改飞书数据。`migrate-experiences` 默认也是 dry-run，只有显式增加 `-- --yes` 才会创建缺失字段并迁移旧「STAR全文」「50字版」「100字版」。`migrate-preferences` 真实执行使用 `-- --yes --write-env`，会创建「偏好设置」表、写入默认偏好，并把 table ID 写进本地 `.env`。执行真实迁移前应先备份并核对 dry-run 输出。
+`migrate-companies` 默认只分析，不写入；只有显式增加 `--apply` 才会修改飞书数据。`migrate-experiences` 默认也是 dry-run，只有显式增加 `-- --yes` 才会创建缺失字段并迁移旧「STAR全文」「50字版」「100字版」。`migrate-preferences` 真实执行使用 `-- --yes --write-env`，会创建「偏好设置」表、写入默认偏好，并把 table ID 写进本地 `.env`。`migrate-calendar` 真实执行使用 `-- --yes --write-env`，会创建「日历」表并把 table ID 写进本地 `.env`。执行真实迁移前应先备份并核对 dry-run 输出。

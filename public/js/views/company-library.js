@@ -14,7 +14,8 @@ import {
   statuses,
   toast,
 } from "../store.js";
-import { confirmDialog, ddlLabel } from "../ui.js";
+import { isWebUrl, siteLinkLabel } from "../site-link.js";
+import { confirmDialog, copyText, ddlLabel } from "../ui.js";
 
 const { computed, reactive, ref, watch } = window.Vue;
 
@@ -53,10 +54,15 @@ export const CompanyLibrary = {
         })
       : [],
     );
-    const counts = computed(() => new Map(
+    const companyProgress = computed(() => new Map(
       state.companies.map((company) => [
         company.recordId,
-        state.jobs.filter((job) => job.companyId === company.recordId).length,
+        (() => {
+          const jobs = state.jobs.filter((job) => job.companyId === company.recordId);
+          const pending = jobs.filter((job) => job.status === "待投").length;
+          if (!jobs.length || pending) return { total: jobs.length, pending, tone: "todo", label: "未投完" };
+          return { total: jobs.length, pending: 0, tone: "done", label: "已投完" };
+        })(),
       ]),
     ));
     const needsResume = computed(() => statusRequiresResume(jobForm.status));
@@ -93,6 +99,10 @@ export const CompanyLibrary = {
       } finally {
         adding.busy = false;
       }
+    }
+
+    async function copySiteUrl(value) {
+      if (await copyText(value)) toast("已复制投递入口");
     }
 
     function beginEdit() {
@@ -223,7 +233,7 @@ export const CompanyLibrary = {
       companies,
       selected,
       companyJobs,
-      counts,
+      companyProgress,
       statuses,
       resumeCodes,
       needsResume,
@@ -241,6 +251,9 @@ export const CompanyLibrary = {
       createJob,
       openJob,
       toggleStar,
+      copySiteUrl,
+      isWebUrl,
+      siteLinkLabel,
       isStarredJob,
       ddlLabel,
     };
@@ -249,7 +262,7 @@ export const CompanyLibrary = {
     <div class="company-library">
       <form class="company-create" @submit.prevent="addCompany">
         <input v-model="adding.name" placeholder="公司名" :disabled="state.offline">
-        <input v-model="adding.siteUrl" type="url" placeholder="官网链接" :disabled="state.offline">
+        <input v-model="adding.siteUrl" type="text" placeholder="官网 / 小程序链接" :disabled="state.offline">
         <button class="primary" :disabled="state.offline || adding.busy">
           {{ adding.busy ? '新增中…' : '新增公司' }}
         </button>
@@ -262,10 +275,13 @@ export const CompanyLibrary = {
       <div v-else class="company-layout">
         <aside class="company-list">
           <button v-for="company in companies" :key="company.recordId"
-            :class="['company-card', { on: selected && selected.recordId === company.recordId }]"
+            :class="['company-card', companyProgress.get(company.recordId)?.tone, { on: selected && selected.recordId === company.recordId }]"
             @click="selectCompany(company.recordId)">
             <strong>{{ company.name }}</strong>
-            <span>{{ counts.get(company.recordId) || 0 }} 个岗位</span>
+            <span class="company-progress" :class="companyProgress.get(company.recordId)?.tone">
+              {{ companyProgress.get(company.recordId)?.label }}
+            </span>
+            <span>{{ companyProgress.get(company.recordId)?.total || 0 }} 个岗位</span>
             <small v-if="company.siteUrl">{{ company.siteUrl }}</small>
           </button>
           <p v-if="!companies.length && !state.loading" class="muted">公司库为空。</p>
@@ -275,7 +291,8 @@ export const CompanyLibrary = {
           <header>
             <div>
               <h2>{{ selected.name }}</h2>
-              <a v-if="selected.siteUrl" :href="selected.siteUrl" target="_blank" rel="noreferrer">官网</a>
+              <a v-if="isWebUrl(selected.siteUrl)" :href="selected.siteUrl" target="_blank" rel="noreferrer">{{ siteLinkLabel(selected.siteUrl) }}</a>
+              <button v-else-if="selected.siteUrl" class="link" type="button" @click="copySiteUrl(selected.siteUrl)">{{ siteLinkLabel(selected.siteUrl) }}</button>
             </div>
             <span class="grow"></span>
             <button class="ghost" :disabled="state.offline" @click="beginEdit">编辑公司</button>
@@ -290,7 +307,7 @@ export const CompanyLibrary = {
 
           <form v-if="mode === 'edit'" class="company-form" @submit.prevent="saveCompany">
             <label><span>公司名</span><input v-model="editing.name" :disabled="state.offline"></label>
-            <label><span>官网链接</span><input v-model="editing.siteUrl" type="url" :disabled="state.offline"></label>
+            <label><span>官网 / 小程序链接</span><input v-model="editing.siteUrl" type="text" :disabled="state.offline"></label>
             <label class="wide"><span>公司背景备注</span><textarea rows="5" v-model="editing.companyBackground" :disabled="state.offline"></textarea></label>
             <label class="wide"><span>备注</span><textarea rows="3" v-model="editing.note" :disabled="state.offline"></textarea></label>
             <div class="drow wide">

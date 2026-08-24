@@ -4,6 +4,7 @@ import { api, token } from "./api.js";
 import { flushOutbox, loadAll, loadHealth, state } from "./store.js";
 import { ConfirmHost } from "./ui.js";
 import { Board } from "./views/board.js";
+import { Calendar } from "./views/calendar.js";
 import { JobComparison } from "./views/job-comparison.js";
 import { JobInfo } from "./views/job-info.js";
 import { Forms } from "./views/forms.js";
@@ -16,7 +17,7 @@ import { Experiences } from "./views/experiences.js";
 const { createApp, computed, ref } = window.Vue;
 
 const NAV = [
-  { group: "", items: [["#/board", "看板"], ["#/compare", "岗位比较"]] },
+  { group: "", items: [["#/board", "看板"], ["#/calendar", "日历"], ["#/compare", "岗位比较"]] },
   {
     group: "当前岗位",
     items: [
@@ -38,6 +39,7 @@ const NAV = [
 
 const VIEWS = {
   "#/board": Board,
+  "#/calendar": Calendar,
   "#/compare": JobComparison,
   "#/job/info": JobInfo,
   "#/job/forms": Forms,
@@ -132,7 +134,7 @@ const App = {
           <button class="link" @click="retry">重试</button>
         </p>
         <p v-if="state.outbox.length" class="banner" :class="{ bad: state.syncError && !state.syncing }">
-          {{ state.syncing ? '同步中' : '待同步' }} · {{ state.outbox.length }} 项本地改动
+          {{ state.syncing ? '同步中' : state.outbox.some(item => item.blocked) ? '待处理' : '待同步' }} · {{ state.outbox.length }} 项本地改动
           <span v-if="state.syncError && !state.syncing">{{ state.syncError }}</span>
           <button class="link" :disabled="state.syncing" @click="syncNow">立即同步</button>
         </p>

@@ -38,6 +38,20 @@ export function appendStatusHistory(value, event) {
   return serializeStatusHistory(duplicated ? current : [...current, entry]);
 }
 
+export function statusHistoryRollsBack(value, event) {
+  const from = clean(event?.from);
+  const to = clean(event?.to);
+  if (!from || !to) return false;
+  const current = parseStatusHistory(value);
+  const latest = current[current.length - 1];
+  return clean(latest?.from) === to && clean(latest?.to) === from;
+}
+
+export function applyStatusHistoryChange(value, event) {
+  if (!statusHistoryRollsBack(value, event)) return appendStatusHistory(value, event);
+  return serializeStatusHistory(parseStatusHistory(value).slice(0, -1));
+}
+
 export function formatStatusTime(value) {
   const date = new Date(asMillis(value));
   const pad = (number) => String(number).padStart(2, "0");

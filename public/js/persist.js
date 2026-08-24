@@ -1,4 +1,4 @@
-// localStorage 三用途：离线快照、AI 草稿暂存、当前岗位。
+// localStorage 用途：离线快照、AI 草稿暂存、当前岗位、本地日历。
 // 草稿必须落盘——AI 生成过的内容是花过钱的，不能因为刷新或误关标签页就没了。
 
 const PREFIX = "jh.";
@@ -39,6 +39,12 @@ export const outbox = {
 export const currentJob = {
   load: () => read("currentJobId", null),
   save: (recordId) => (recordId ? write("currentJobId", recordId) : remove("currentJobId")),
+};
+
+export const calendarEvents = {
+  load: () => read("calendarEvents", []),
+  save: (items) => write("calendarEvents", Array.isArray(items) ? items : []),
+  clear: () => remove("calendarEvents"),
 };
 
 /** 草稿按 `${kind}:${scopeId}` 分槽，换岗位不会串味。 */

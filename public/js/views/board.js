@@ -9,7 +9,9 @@ import {
   state,
   toast,
 } from "../store.js";
-import { FieldRow, ageLabel, ddlLabel, isStale, isUrgent } from "../ui.js";
+import { isWebUrl, siteLinkLabel } from "../site-link.js";
+import { FieldRow, ageLabel, copyText, ddlLabel, isStale, isUrgent } from "../ui.js";
+import { matchesJobSearch } from "../job-search.js";
 import { CompanyLibrary } from "./company-library.js";
 
 const { computed, nextTick, ref, watch } = window.Vue;
@@ -37,7 +39,10 @@ export const Board = {
     });
     const showClosed = ref(false);
     const editJd = ref(false);
+    const search = ref("");
     const companyLibrary = ref(null);
+    const draggingId = ref("");
+    const dragOverStatus = ref("");
 
     async function beginJob() {
       tab.value = COMPANY_TAB;
@@ -45,12 +50,14 @@ export const Board = {
       companyLibrary.value?.beginJob();
     }
 
-    const inStatus = (status) => byUrgency(state.jobs.filter((job) => job.status === status));
+    const filteredJobs = computed(() => state.jobs.filter((job) => matchesJobSearch(job, search.value)));
+    const searchActive = computed(() => Boolean(search.value.trim()));
+    const inStatus = (status) => byUrgency(filteredJobs.value.filter((job) => job.status === status));
     const tabs = computed(() => ["全部", COMPANY_TAB, ...ACTIVE_STATUSES.value, CLOSED_TAB]);
     const columns = computed(() =>
       ACTIVE_STATUSES.value.map((status) => ({ status, jobs: inStatus(status) })),
     );
-    const closed = computed(() => byUrgency(state.jobs.filter((job) => isClosed(job.status))));
+    const closed = computed(() => byUrgency(filteredJobs.value.filter((job) => isClosed(job.status))));
     const closedSummary = computed(() => {
       const counts = new Map();
       for (const job of closed.value) counts.set(job.status, (counts.get(job.status) || 0) + 1);
@@ -85,10 +92,48 @@ export const Board = {
       }
     }
 
+    function beginDrag(job, event) {
+      if (!job?.recordId) return;
+      draggingId.value = job.recordId;
+      setCurrentJob(job.recordId);
+      if (event?.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", job.recordId);
+      }
+    }
+
+    function endDrag() {
+      draggingId.value = "";
+      dragOverStatus.value = "";
+    }
+
+    async function dropOnStatus(status, event) {
+      event?.preventDefault();
+      const recordId = event?.dataTransfer?.getData("text/plain") || draggingId.value;
+      endDrag();
+      const job = state.jobs.find((item) => item.recordId === recordId);
+      if (!job || !status) return;
+      setCurrentJob(recordId);
+      if (job.status === status) return;
+      try {
+        await saveJobPatch(recordId, { status });
+        toast(`已移动到「${status}」`);
+      } catch (failure) {
+        if (!handleError(failure)) toast(failure.message || "移动失败");
+      }
+    }
+
+    async function copySiteUrl(value) {
+      if (await copyText(value)) toast("已复制投递入口");
+    }
+
     return {
       state,
       tab,
       tabs,
+      search,
+      searchActive,
+      filteredJobs,
       columns,
       closed,
       closedSummary,
@@ -100,6 +145,14 @@ export const Board = {
       editJd,
       saveJd,
       toggleStar,
+      beginDrag,
+      endDrag,
+      dropOnStatus,
+      draggingId,
+      dragOverStatus,
+      copySiteUrl,
+      isWebUrl,
+      siteLinkLabel,
       setCurrentJob,
       isStarredJob,
       ddlLabel,
@@ -113,8 +166,16 @@ export const Board = {
   template: `
     <div class="board-page">
       <div class="board-summary">
+        <label class="board-search">
+          <span>搜索</span>
+          <input v-model="search" type="search" placeholder="公司或岗位，支持部分关键词">
+          <button v-if="search" class="link" type="button" @click="search = ''">清除</button>
+        </label>
         <span v-if="state.loading" class="muted">正在加载…</span>
-        <span v-else class="muted">{{ state.companies.length }} 家公司 · {{ state.jobs.length }} 个岗位</span>
+        <span v-else class="muted">
+          {{ state.companies.length }} 家公司 · {{ state.jobs.length }} 个岗位
+          <template v-if="searchActive"> · 命中 {{ filteredJobs.length }} 个</template>
+        </span>
         <button class="primary" :disabled="state.offline || !state.companies.length" @click="beginJob">新建岗位</button>
       </div>
 
@@ -128,15 +189,23 @@ export const Board = {
 
       <template v-else-if="tab === '全部'">
         <div class="cols">
-          <section v-for="col in columns" :key="col.status" class="col">
+          <section v-for="col in columns" :key="col.status" class="col"
+            :class="{ 'drag-over': dragOverStatus === col.status }"
+            @dragenter.prevent="dragOverStatus = col.status"
+            @dragover.prevent="dragOverStatus = col.status"
+            @drop="dropOnStatus(col.status, $event)">
             <h3>{{ col.status }} <em>{{ col.jobs.length }}</em></h3>
             <article v-for="job in col.jobs" :key="job.recordId"
-              :class="{ urgent: isUrgent(job), on: job.recordId === state.currentJobId, starred: isStarredJob(job) }"
+              draggable="true"
+              :class="{ urgent: isUrgent(job), on: job.recordId === state.currentJobId, starred: isStarredJob(job), dragging: draggingId === job.recordId }"
+              @dragstart="beginDrag(job, $event)"
+              @dragend="endDrag"
               @click="setCurrentJob(job.recordId)">
               <div class="job-card-head">
                 <strong>{{ job.company }}</strong>
                 <button class="star-button compact" :class="{ on: isStarredJob(job) }"
                   :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
+                  draggable="false"
                   @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
               </div>
               <span class="pos">{{ job.position }}</span>
@@ -145,7 +214,7 @@ export const Board = {
               <small v-if="job.resumeId" class="muted">{{ job.resumeId }}</small>
               <small v-if="job.pendingSync" class="bad">待同步</small>
             </article>
-            <p v-if="!col.jobs.length" class="colempty">—</p>
+            <p v-if="!col.jobs.length" class="colempty">{{ searchActive ? '无匹配' : '—' }}</p>
           </section>
         </div>
 
@@ -167,7 +236,7 @@ export const Board = {
                 :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
                 @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
             </article>
-            <p v-if="!closed.length" class="muted">还没有结束的岗位。</p>
+            <p v-if="!closed.length" class="muted">{{ searchActive ? '已结束里没有匹配的岗位。' : '还没有结束的岗位。' }}</p>
           </div>
         </section>
       </template>
@@ -175,7 +244,7 @@ export const Board = {
       <div v-else class="quick">
         <aside class="qlist">
           <p v-if="state.loading" class="muted">正在加载岗位…</p>
-          <p v-else-if="!listed.length" class="muted">这个状态下没有岗位。</p>
+          <p v-else-if="!listed.length" class="muted">{{ searchActive ? '这个状态下没有匹配的岗位。' : '这个状态下没有岗位。' }}</p>
           <article v-for="job in listed" :key="job.recordId"
             :class="{ urgent: isUrgent(job), on: detail && job.recordId === detail.recordId, starred: isStarredJob(job) }"
             @click="setCurrentJob(job.recordId)">
@@ -207,7 +276,8 @@ export const Board = {
             <span v-else-if="detail.status === '待投'" class="pill" :class="{ warn: isStale(detail) }">{{ ageLabel(detail) }}</span>
             <span v-if="detail.resumeId" class="pill">{{ detail.resumeId }}</span>
             <span class="grow"></span>
-            <a v-if="detail.siteUrl" class="ghost" :href="detail.siteUrl" target="_blank" rel="noreferrer">官网</a>
+            <a v-if="isWebUrl(detail.siteUrl)" class="ghost" :href="detail.siteUrl" target="_blank" rel="noreferrer">{{ siteLinkLabel(detail.siteUrl) }}</a>
+            <button v-else-if="detail.siteUrl" class="ghost" type="button" @click="copySiteUrl(detail.siteUrl)">{{ siteLinkLabel(detail.siteUrl) }}</button>
             <a class="ghost" href="#/job/info">编辑岗位</a>
           </header>
           <dl class="meta">
