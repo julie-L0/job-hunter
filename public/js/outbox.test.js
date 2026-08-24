@@ -80,7 +80,6 @@ test("syncing items are not merge targets for later local changes", () => {
   assert.deepEqual(merged[0].patch, { starred: "星标" });
   assert.deepEqual(merged[1].patch, { starred: "" });
 });
-
 test("repair copies a later resume patch into an earlier required status patch", () => {
   const result = repairOutboxItems([
     { id: "status-1", kind: "job.patch", recordId: "job-1", patch: { status: "已投" }, statusChange: { to: "已投" } },

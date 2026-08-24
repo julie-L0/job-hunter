@@ -122,7 +122,6 @@ export const Board = {
         if (!handleError(failure)) toast(failure.message || "移动失败");
       }
     }
-
     async function copySiteUrl(value) {
       if (await copyText(value)) toast("已复制投递入口");
     }
@@ -149,8 +148,7 @@ export const Board = {
       endDrag,
       dropOnStatus,
       draggingId,
-      dragOverStatus,
-      copySiteUrl,
+      dragOverStatus,      copySiteUrl,
       isWebUrl,
       siteLinkLabel,
       setCurrentJob,
