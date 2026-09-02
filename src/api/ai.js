@@ -11,7 +11,7 @@ import {
 } from "../services/job-comparison.js";
 import { getComparisonPreference } from "../services/preferences.js";
 import { buildFixedFillFormLibrary, hasRepeatableFormFields, parseOpenQuestions } from "../services/fill-form.js";
-import { appendDocText } from "../services/prep-doc.js";
+import { appendDocText } from "../services/lark-doc.js";
 
 const INTRO_VARIANTS = {
   "1min": { duration: "1分钟", language_line: "", field: "intro1min" },

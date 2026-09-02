@@ -194,6 +194,19 @@ const SEED_EXPERIENCES = [
   },
 ];
 
+// 挂在前两条 SEED_JOBS 上，让 LARK_MOCK=1 能走通复盘列表和详情。正文不在这里——
+// 正文只存在 docUrl 指向的飞书文档里，mock 下那个链接是假的，打不开是预期行为。
+const SEED_REVIEWS = [
+  { round: "一面", interviewedAt: inDays(-4), source: "本地转写",
+    docUrl: "https://feishu.cn/docx/docMOCKreview1", audioName: "字节一面.m4a",
+    durationSec: 3120, transcriptChars: 8600, commentStatus: "已点评",
+    takeaway: "活动复盘讲得清楚，但被追问北极星指标怎么定时答得含糊",
+    updatedAt: inDays(-4) },
+  { round: "笔试", interviewedAt: inDays(-1), source: "粘贴文本",
+    docUrl: "", audioName: "", durationSec: 0, transcriptChars: 2400,
+    commentStatus: "未点评", takeaway: "", updatedAt: inDays(-1) },
+];
+
 function jd(company, position, duty) {
   return [
     `【${company} · ${position}】`,
@@ -212,6 +225,7 @@ function jd(company, position, duty) {
 
 function seed() {
   const companyIds = new Map();
+  const jobRefs = [];
   for (const { duty, age, ...job } of SEED_JOBS) {
     if (!companyIds.has(job.company)) {
       const company = insert("company", {
@@ -222,12 +236,25 @@ function seed() {
       });
       companyIds.set(job.company, company.record_id);
     }
-    insert("main", {
+    const record = insert("main", {
       ...job,
       companyId: companyIds.get(job.company),
       jd: jd(job.company, job.position, duty),
     }, age || 0);
+    jobRefs.push({ recordId: record.record_id, company: job.company, position: job.position });
   }
   for (const resume of SEED_RESUMES) insert("resume", resume);
   for (const experience of SEED_EXPERIENCES) insert("experience", experience);
+  SEED_REVIEWS.forEach((review, index) => {
+    const job = jobRefs[index];
+    if (!job) return;
+    const day = new Date(review.interviewedAt).toISOString().slice(0, 10);
+    insert("review", {
+      ...review,
+      jobRecordId: job.recordId,
+      company: job.company,
+      position: job.position,
+      title: `${job.company}-${job.position} ${review.round} ${day}`,
+    });
+  });
 }

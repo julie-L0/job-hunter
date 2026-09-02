@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "api/[...path].js": {
-      "includeFiles": "prompts/**"
-    }
-  }
-}

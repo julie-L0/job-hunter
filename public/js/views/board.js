@@ -10,8 +10,9 @@ import {
   toast,
 } from "../store.js";
 import { isWebUrl, siteLinkLabel } from "../site-link.js";
-import { FieldRow, ageLabel, copyText, ddlLabel, isStale, isUrgent } from "../ui.js";
+import { FieldRow, ageLabel, copyText, ddlLabel, isLongStanding, isStale, isUrgent, isDeadlineSoon } from "../ui.js";
 import { matchesJobSearch } from "../job-search.js";
+import { dailyJobStats, formatStatsDate } from "../job-stats.js";
 import { CompanyLibrary } from "./company-library.js";
 
 const { computed, nextTick, ref, watch } = window.Vue;
@@ -43,6 +44,7 @@ export const Board = {
     const companyLibrary = ref(null);
     const draggingId = ref("");
     const dragOverStatus = ref("");
+    const dailyStats = computed(() => dailyJobStats(state.jobs));
 
     async function beginJob() {
       tab.value = COMPANY_TAB;
@@ -107,6 +109,17 @@ export const Board = {
       dragOverStatus.value = "";
     }
 
+    function enterStatusColumn(status, event) {
+      if (!draggingId.value || !status || event?.relatedTarget === event?.currentTarget) return;
+      dragOverStatus.value = status;
+    }
+
+    function leaveStatusColumn(status, event) {
+      if (dragOverStatus.value !== status) return;
+      const next = event?.relatedTarget;
+      if (!next || !event.currentTarget.contains(next)) dragOverStatus.value = "";
+    }
+
     async function dropOnStatus(status, event) {
       event?.preventDefault();
       const recordId = event?.dataTransfer?.getData("text/plain") || draggingId.value;
@@ -147,8 +160,12 @@ export const Board = {
       beginDrag,
       endDrag,
       dropOnStatus,
+      enterStatusColumn,
+      leaveStatusColumn,
       draggingId,
       dragOverStatus,      copySiteUrl,
+      dailyStats,
+      formatStatsDate,
       isWebUrl,
       siteLinkLabel,
       setCurrentJob,
@@ -157,6 +174,8 @@ export const Board = {
       ageLabel,
       isUrgent,
       isStale,
+      isDeadlineSoon,
+      isLongStanding,
       CLOSED_TAB,
       COMPANY_TAB,
     };
@@ -177,25 +196,34 @@ export const Board = {
         <button class="primary" :disabled="state.offline || !state.companies.length" @click="beginJob">新建岗位</button>
       </div>
 
+      <section class="daily-stats" aria-label="今日统计">
+        <span class="muted">{{ formatStatsDate(dailyStats.date) }}统计</span>
+        <span>新增岗位 <strong>{{ dailyStats.newJobs }}</strong></span>
+        <span>投递 <strong>{{ dailyStats.applied }}</strong></span>
+        <span>测评 <strong>{{ dailyStats.assessments }}</strong></span>
+        <span>面试 <strong>{{ dailyStats.interviews }}</strong></span>
+      </section>
+
       <nav class="tabs">
         <button v-for="name in tabs" :key="name" :class="{ on: tab === name }" @click="tab = name">
           {{ name }}
         </button>
       </nav>
 
-      <CompanyLibrary v-if="tab === COMPANY_TAB" ref="companyLibrary" />
+      <CompanyLibrary v-if="tab === COMPANY_TAB" ref="companyLibrary" :query="search" />
 
       <template v-else-if="tab === '全部'">
         <div class="cols">
           <section v-for="col in columns" :key="col.status" class="col"
             :class="{ 'drag-over': dragOverStatus === col.status }"
-            @dragenter.prevent="dragOverStatus = col.status"
-            @dragover.prevent="dragOverStatus = col.status"
+            @dragenter.prevent="enterStatusColumn(col.status, $event)"
+            @dragover.prevent="enterStatusColumn(col.status, $event)"
+            @dragleave="leaveStatusColumn(col.status, $event)"
             @drop="dropOnStatus(col.status, $event)">
             <h3>{{ col.status }} <em>{{ col.jobs.length }}</em></h3>
             <article v-for="job in col.jobs" :key="job.recordId"
               draggable="true"
-              :class="{ urgent: isUrgent(job), on: job.recordId === state.currentJobId, starred: isStarredJob(job), dragging: draggingId === job.recordId }"
+              :class="{ urgent: isUrgent(job), 'deadline-mark': job.status === '待投' && isDeadlineSoon(job), 'age-mark': job.status === '待投' && !isDeadlineSoon(job) && isLongStanding(job), on: job.recordId === state.currentJobId, starred: isStarredJob(job), dragging: draggingId === job.recordId }"
               @dragstart="beginDrag(job, $event)"
               @dragend="endDrag"
               @click="setCurrentJob(job.recordId)">
@@ -223,7 +251,7 @@ export const Board = {
           </button>
           <div v-if="showClosed" class="closedlist">
             <article v-for="job in closed" :key="job.recordId"
-              :class="{ on: job.recordId === state.currentJobId, starred: isStarredJob(job) }" @click="setCurrentJob(job.recordId)">
+              :class="{ on: job.recordId === state.currentJobId, 'deadline-mark': job.status === '待投' && isDeadlineSoon(job), 'age-mark': job.status === '待投' && !isDeadlineSoon(job) && isLongStanding(job), starred: isStarredJob(job) }" @click="setCurrentJob(job.recordId)">
               <span class="dot" :class="'s-' + job.status"></span>
               <strong>{{ job.company }}</strong>
               <span class="pos">{{ job.position }}</span>
@@ -244,7 +272,7 @@ export const Board = {
           <p v-if="state.loading" class="muted">正在加载岗位…</p>
           <p v-else-if="!listed.length" class="muted">{{ searchActive ? '这个状态下没有匹配的岗位。' : '这个状态下没有岗位。' }}</p>
           <article v-for="job in listed" :key="job.recordId"
-            :class="{ urgent: isUrgent(job), on: detail && job.recordId === detail.recordId, starred: isStarredJob(job) }"
+            :class="{ urgent: isUrgent(job), 'deadline-mark': job.status === '待投' && isDeadlineSoon(job), 'age-mark': job.status === '待投' && !isDeadlineSoon(job) && isLongStanding(job), on: detail && job.recordId === detail.recordId, starred: isStarredJob(job) }"
             @click="setCurrentJob(job.recordId)">
             <div class="job-card-head">
               <strong>{{ job.company }}</strong>

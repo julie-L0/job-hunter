@@ -6,7 +6,15 @@
 
 node_modules/
 .DS_Store
-.vercel
 
 # 本机的权限授予，跟别人无关
 .claude/settings.local.json
+.memory/
+
+# 本地转写工具：venv 几百 MB、模型上 G，录音是面试原始内容，都不进仓库。
+# 只有 tools/transcribe/*.py 和 README.md 需要版本管理。
+tools/transcribe/.venv/
+tools/transcribe/models/
+tools/transcribe/audio/
+*.onnx
+*.tar.bz2

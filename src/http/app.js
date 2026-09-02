@@ -48,7 +48,7 @@ export function createApp(routes) {
       if (route.method !== method) continue;
 
       try {
-        if (!route.public) requireAuth(headers);
+        if (!route.public) assertAuthorized(headers);
         const data = await route.handler({
           params,
           query: Object.fromEntries(parsed.searchParams),
@@ -74,7 +74,7 @@ export function createApp(routes) {
 }
 
 function productionAuthRequired() {
-  return Boolean(process.env.VERCEL) || process.env.NODE_ENV === "production";
+  return process.env.NODE_ENV === "production";
 }
 
 export function isAuthRequired() {
@@ -178,7 +178,11 @@ export function createSession(password, headers = {}) {
   return { token: issueSessionToken(now), expiresAt: now + SESSION_TTL_MS };
 }
 
-function requireAuth(headers) {
+/**
+ * 口令校验。走 createApp 的路由会自动调；二进制上传这类绕开 JSON 路由的分支
+ * （见 dev-server.js 的录音上传）必须自己显式调一次，不得因为路径特殊就跳过。
+ */
+export function assertAuthorized(headers) {
   if (!isAuthRequired()) return;
   assertAuthConfigured();
   const token = headerValue(headers, "x-auth-token");

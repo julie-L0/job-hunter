@@ -15,7 +15,7 @@ import {
 import { getCompany, getJob, hydrateJob, listJobs } from "../services/companies.js";
 import { recomputeApplyRecords } from "../services/resume.js";
 import { applyStatusHistoryChange } from "../services/status-history.js";
-import { createPrepDoc } from "../services/prep-doc.js";
+import { createLarkDoc } from "../services/lark-doc.js";
 
 const JOB_PATCH_FIELDS = new Set([
   "position",
@@ -160,7 +160,7 @@ export const jobRoutes = [
     handler: async ({ params }) => {
       const job = await getJob(params.recordId);
       if (job.prepDocUrl) throw new HttpError(409, `已有准备文档：${job.prepDocUrl}`);
-      const doc = await createPrepDoc({
+      const doc = await createLarkDoc({
         title: `${job.company}-${job.position} 面试准备`,
         content: `# ${job.company} ${job.position}\n\n## JD\n${job.jd}\n\n## 面试复盘\n`,
       });

@@ -18,6 +18,7 @@
     "migrate-jobs": "node --env-file-if-exists=.env src/scripts/migrate-jobs.js",
     "migrate-preferences": "node --env-file-if-exists=.env src/scripts/migrate-preferences.js",
     "migrate-experiences": "node --env-file-if-exists=.env src/scripts/migrate-experiences.js",
-    "migrate-calendar": "node --env-file-if-exists=.env src/scripts/migrate-calendar.js"
+    "migrate-calendar": "node --env-file-if-exists=.env src/scripts/migrate-calendar.js",
+    "migrate-reviews": "node --env-file-if-exists=.env src/scripts/migrate-reviews.js"
   }
 }

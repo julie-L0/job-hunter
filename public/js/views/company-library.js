@@ -16,6 +16,7 @@ import {
 } from "../store.js";
 import { isWebUrl, siteLinkLabel } from "../site-link.js";
 import { confirmDialog, copyText, ddlLabel } from "../ui.js";
+import { matchesCompanySearch, matchesJobSearch } from "../job-search.js";
 
 const { computed, reactive, ref, watch } = window.Vue;
 
@@ -32,22 +33,40 @@ function blankJob() {
 }
 
 export const CompanyLibrary = {
-  setup() {
+  props: {
+    query: { type: String, default: "" },
+  },
+  setup(props) {
     const mode = ref("");
     const adding = reactive({ name: "", siteUrl: "", busy: false, error: "" });
     const editing = reactive({ name: "", siteUrl: "", companyBackground: "", note: "", busy: false, error: "" });
     const deleting = ref(false);
     const jobForm = reactive(blankJob());
 
-    const companies = computed(() => [...state.companies].sort((a, b) =>
-      String(a.name || "").localeCompare(String(b.name || ""), "zh-CN"),
-    ));
+    const searchQuery = computed(() => String(props.query || ""));
+    const companies = computed(() => [...state.companies]
+      .filter((company) => matchesCompanySearch(
+        company,
+        state.jobs.filter((job) => job.companyId === company.recordId),
+        searchQuery.value,
+      ))
+      .sort((a, b) => {
+        const jobsA = state.jobs.filter((job) => job.companyId === a.recordId);
+        const jobsB = state.jobs.filter((job) => job.companyId === b.recordId);
+        const pendingA = !jobsA.length || jobsA.some((job) => job.status === "待投");
+        const pendingB = !jobsB.length || jobsB.some((job) => job.status === "待投");
+        return Number(pendingB) - Number(pendingA)
+          || String(a.name || "").localeCompare(String(b.name || ""), "zh-CN");
+      }));
     const selected = computed(() =>
-      state.companies.find((company) => company.recordId === state.currentCompanyId) || null,
+      companies.value.find((company) => company.recordId === state.currentCompanyId)
+      || companies.value[0]
+      || null,
     );
     const companyJobs = computed(() => selected.value
       ? state.jobs
         .filter((job) => job.companyId === selected.value.recordId)
+        .filter((job) => matchesJobSearch(job, searchQuery.value))
         .sort((a, b) => {
           const starOrder = Number(isStarredJob(b)) - Number(isStarredJob(a));
           return starOrder || (b.createdAt || 0) - (a.createdAt || 0);
@@ -233,6 +252,7 @@ export const CompanyLibrary = {
       companies,
       selected,
       companyJobs,
+      searchQuery,
       companyProgress,
       statuses,
       resumeCodes,

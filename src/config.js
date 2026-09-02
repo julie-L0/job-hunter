@@ -12,7 +12,7 @@ export const config = {
     docFolderToken: process.env.LARK_DOC_FOLDER_TOKEN || "",
     docUrlBase: process.env.LARK_DOC_URL_BASE || "https://feishu.cn/docx/",
     // 内存假数据，仅供本地开发。VERCEL 由平台自动注入，所以线上不可能命中，哪怕后台误填 LARK_MOCK
-    mock: process.env.LARK_MOCK === "1" && !process.env.VERCEL,
+    mock: process.env.LARK_MOCK === "1",
     tables: {
       company: process.env.BITABLE_TABLE_COMPANY || "",
       main: process.env.BITABLE_TABLE_MAIN || "",
@@ -20,7 +20,17 @@ export const config = {
       resume: process.env.BITABLE_TABLE_RESUME || "",
       preference: process.env.BITABLE_TABLE_PREFERENCE || "",
       calendar: process.env.BITABLE_TABLE_CALENDAR || "",
+      review: process.env.BITABLE_TABLE_REVIEW || "",
     },
+  },
+
+  // 本地语音转写。引擎是仓库外部的 Python 工具（tools/transcribe/），Node 侧只用 child_process 调，
+  // 所以这里全是路径而不是 npm 包。三项都没配就等于关闭该功能，见 services/transcribe.js。
+  asr: {
+    pythonPath: process.env.ASR_PYTHON || "",
+    scriptPath: process.env.ASR_SCRIPT || "",
+    modelDir: process.env.ASR_MODEL_DIR || "",
+    maxUploadMb: Number(process.env.ASR_MAX_UPLOAD_MB || 1024),
   },
 
   llm: {

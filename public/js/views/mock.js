@@ -1,9 +1,10 @@
-// Mock 面试（F8）。对话流 + 每个面试官气泡上实时标记。
+// Mock 面试（F8）+ 真实面试复盘（F10）两个 tab。两边共用岗位选择器，但草稿各自独立。
 // 追问建议里的经历必须用下拉选：后端靠标题字符串精确匹配经历记录（src/api/ai.js:157），
 // 模型把标题写歪一个字 recordId 就是 null。AI 的输出不该当机器 key 用。
 import { api } from "../api.js";
 import { currentJobRef, handleError, jobReady, mergeExperience, state, toast } from "../store.js";
 import { NeedJob, PageJobPicker, confirmDialog, copyText, useDraft } from "../ui.js";
+import { RealReview } from "./review.js";
 
 const { computed, ref } = window.Vue;
 
@@ -29,8 +30,9 @@ function download(filename, text) {
   URL.revokeObjectURL(url);
 }
 
-export const Mock = {
-  components: { NeedJob, PageJobPicker },
+// 对话流 + 每个面试官气泡上实时标记。岗位选择器在外层 Mock 里，这里不重复渲染。
+const MockInterview = {
+  components: { NeedJob },
   setup() {
     const job = currentJobRef;
     const busy = ref(false);
@@ -153,7 +155,6 @@ export const Mock = {
     };
   },
   template: `
-    <PageJobPicker />
     <NeedJob v-if="!jobReady" what="Mock 面试" :job="job" />
     <div v-else class="page">
       <h2 class="ptitle">Mock 面试 · {{ job.company }} {{ job.position }}</h2>
@@ -236,4 +237,21 @@ export const Mock = {
         </section>
       </template>
     </div>`,
+};
+
+export const Mock = {
+  components: { PageJobPicker, MockInterview, RealReview },
+  setup() {
+    // 两个 tab 各自一套 useDraft，互不干扰。切走了不会丢：草稿存在 localStorage 里。
+    const tab = ref("mock");
+    return { tab };
+  },
+  template: `
+    <PageJobPicker />
+    <div class="tabs">
+      <button :class="{ on: tab === 'mock' }" @click="tab = 'mock'">模拟面试</button>
+      <button :class="{ on: tab === 'review' }" @click="tab = 'review'">真实面试复盘</button>
+    </div>
+    <MockInterview v-if="tab === 'mock'" />
+    <RealReview v-else />`,
 };

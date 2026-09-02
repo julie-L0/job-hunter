@@ -3,7 +3,7 @@ import { readFile } from "fs/promises";
 const PROMPT_DIR = new URL("../../prompts/", import.meta.url);
 const cache = new Map();
 
-/** 读取 prompts/<name>.md 并替换 {{var}} 占位符。生产环境靠 vercel.json 的 includeFiles 打包进去。 */
+/** 读取 prompts/<name>.md 并替换 {{var}} 占位符。 */
 export async function loadPrompt(name, vars = {}) {
   if (!/^[a-z0-9-]+$/.test(name)) throw new Error(`非法 prompt 名：${name}`);
 

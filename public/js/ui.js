@@ -46,6 +46,12 @@ export function isUrgent(job) {
  * 招满为止的岗位没有投递DDL，风险随「加进来多久还没投」单调上升，所以另算一种紧迫。
  * createdAt 是飞书记录自带的创建时间，不占字段。
  */
+export function isDeadlineSoon(job) {
+  if (!job?.deadline) return false;
+  const left = daysLeft(job.deadline);
+  return left !== null && left >= 0 && left <= 10;
+}
+
 export function ageDays(job) {
   if (!job?.createdAt) return null;
   const days = daysLeft(job.createdAt);
@@ -63,6 +69,11 @@ export function isStale(job) {
   if (job.status !== "待投" || job.deadline) return false;
   const days = ageDays(job);
   return days !== null && days >= 7;
+}
+
+export function isLongStanding(job) {
+  const days = ageDays(job);
+  return days !== null && days >= 20;
 }
 
 export async function copyText(text) {

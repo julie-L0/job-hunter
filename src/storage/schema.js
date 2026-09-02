@@ -79,6 +79,29 @@ export const SCHEMAS = {
     },
   },
 
+  // 每场真实面试一条。逐字记录、我的补充和 AI 点评都写在 docUrl 指向的飞书文档里，
+  // 表里只存元数据和链接——正文存两份就一定会出现两个权威版本。
+  review: {
+    tableId: () => config.lark.tables.review,
+    primary: "title",
+    fields: {
+      title: { name: "复盘标题", type: "text" },
+      jobRecordId: { name: "岗位记录ID", type: "text" },
+      company: { name: "公司名", type: "text" },
+      position: { name: "岗位名", type: "text" },
+      round: { name: "面试轮次", type: "text" },
+      interviewedAt: { name: "面试时间", type: "datetime" },
+      source: { name: "内容来源", type: "text" },
+      docUrl: { name: "复盘文档链接", type: "text" },
+      audioName: { name: "录音文件名", type: "text" },
+      durationSec: { name: "录音时长秒", type: "number" },
+      transcriptChars: { name: "转写字数", type: "number" },
+      takeaway: { name: "一句话结论", type: "text" },
+      commentStatus: { name: "点评状态", type: "text" },
+      updatedAt: { name: "更新时间", type: "datetime" },
+    },
+  },
+
   calendar: {
     tableId: () => config.lark.tables.calendar,
     primary: "title",
@@ -103,6 +126,14 @@ export const JOB_STAR_VALUE = "星标";
 export const RESUME_REQUIRED_STATUSES = new Set(JOB_STATUSES.slice(1));
 export const EXPERIENCE_TYPES = ["实习经历", "项目经历", "校园经历", "荣誉/获奖", "语言/证书", "其他"];
 export const COMPARISON_STAGES = ["练手", "均衡", "冲刺", "兜底"];
+
+// 复盘表的三个枚举字段都是 text，不是 select：飞书 select 写入不存在的选项会直接报错
+// （和「技能标签」同一个坑），而 calendar.类型 已经有用 text 存枚举的先例。
+// 取值合法性由 services/review.js 校验，不靠飞书字段类型兜。
+export const INTERVIEW_ROUNDS = ["笔试", "一面", "二面", "三面", "HR面", "其他"];
+export const REVIEW_SOURCES = ["本地转写", "粘贴文本", "Mock 面试"];
+export const REVIEW_COMMENT_STATUSES = ["未点评", "已点评"];
+export const REVIEW_ROLES = ["面试官", "其他面试者", "我"];
 
 // 多选字段写入不存在的选项会报 800030005，新增选项属于表结构变更（红线）
 export const EXPERIENCE_TAGS = [

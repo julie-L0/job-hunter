@@ -335,6 +335,8 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 
 .page { max-width: 1040px; }
 .board-page { max-width: none; }
+.daily-stats { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 10px 0 14px; padding: 8px 0; border-bottom: 1px solid var(--line); color: var(--dim); font-size: 12px; }
+.daily-stats strong { margin-left: 4px; color: var(--ink); font-size: 15px; }
 .ptitle { font-size: 17px; margin: 0 0 4px; }
 .empty {
   max-width: 560px;
@@ -446,7 +448,7 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 
 /* ---- 看板：全部视图 ---- */
 
-.cols { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.cols { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
 .col {
   min-height: 96px;
   padding: 6px;
@@ -476,6 +478,8 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .col article.on, .qlist article.on { border-left-color: var(--accent); background: var(--accent-soft); }
 .col article.urgent, .qlist article.urgent { border-left-color: var(--warn); }
 .col article.starred, .qlist article.starred { border-top-color: #ead9a5; }
+.col article.deadline-mark, .qlist article.deadline-mark, .closedlist article.deadline-mark { border-color: #d46a3a; }
+.col article.age-mark, .qlist article.age-mark, .closedlist article.age-mark { border-color: #718096; }
 .job-card-head { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
 .job-card-head strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .job-card-head .star-button { margin: -4px -4px 0 0; flex: none; }
@@ -1070,6 +1074,51 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .comparison-jd-checklist li strong span { display: inline-flex; flex: none; font-size: 12px; color: var(--dim); }
 .comparison-jd-checklist li em { display: block; margin: 4px 0; color: var(--text); font-style: normal; line-height: 1.6; }
 
+/* ---- 真实面试复盘 ---- */
+
+.review-source { display: grid; gap: 12px; margin: 14px 0; }
+.review-source .qcard textarea { margin-top: 8px; }
+.review-source code { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; }
+
+/* 文件选择：原生 input 控不了样式，包一层 label 当按钮用，但 input 仍在 DOM 里可键盘操作 */
+.filepick { position: relative; display: inline-flex; align-items: center; overflow: hidden; cursor: pointer; }
+.filepick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.filepick:has(input:disabled) { opacity: 0.5; cursor: default; }
+
+.review-progress { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.review-progress-bar { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.review-progress-bar span { display: block; height: 100%; background: var(--accent); transition: width 0.3s; }
+
+.review-doc {
+  min-height: 520px;
+  margin: 10px 0 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.review-segments {
+  display: grid;
+  gap: 4px;
+  max-height: 460px;
+  overflow-y: auto;
+  margin: 10px 0 4px;
+  padding: 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.review-segment { display: grid; grid-template-columns: 52px 62px minmax(0, 1fr) auto; align-items: start; gap: 8px; }
+.review-segment textarea { min-height: 34px; padding: 6px 8px; resize: vertical; field-sizing: content; }
+.review-segment.ask textarea { border-left: 3px solid var(--accent); }
+.review-role { justify-self: start; white-space: nowrap; }
+.review-time { font-size: 12px; padding-top: 7px; white-space: nowrap; }
+
+.review-h { font-size: 14px; margin: 18px 0 6px; }
+.review-list { margin: 0 0 8px; padding-left: 18px; }
+.review-list li { margin: 5px 0; line-height: 1.7; }
+
 /* ---- 窄屏兜底。桌面优先，这里只保证「能用」，不做专门的移动端交互 ---- */
 
 @media (max-width: 900px) {
@@ -1116,6 +1165,10 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   .page-job-picker .jobpick { width: 100%; }
   .bubble.user { align-self: stretch; }
   .furow select { flex: 1 1 100%; }
+
+  /* 390px 下四列排不下：角色 + 时间 + 删占第一行，文本框整行占第二行 */
+  .review-segment { grid-template-columns: auto auto minmax(0, 1fr); }
+  .review-segment textarea { grid-column: 1 / -1; grid-row: 2; }
 
   .comparison-workspace { grid-template-columns: minmax(0, 1fr); }
   .comparison-picker { padding: 16px 0; border-right: 0; border-bottom: 1px solid var(--line); }

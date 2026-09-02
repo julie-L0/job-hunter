@@ -29,7 +29,7 @@
 - Node.js 22 或更高版本
 - ESM，后端零第三方依赖
 - Vue 3 固定版本随仓库提供，不依赖 CDN
-- 本地 Node 服务与 Vercel Functions 共用同一套路由
+- 本地 Node 服务提供全部 API 与前端页面
 - 数据保存在使用者自己的飞书空间中，仓库不包含业务数据
 
 ## 快速体验
@@ -93,7 +93,6 @@ npm start
 ## 项目结构
 
 ```text
-api/                 Vercel Functions 入口
 public/              浏览器前端与固定版本 Vue
 prompts/             AI prompt 模板
 src/api/             API 路由

@@ -10,6 +10,8 @@ import { experienceRoutes } from "./experiences.js";
 import { aiRoutes } from "./ai.js";
 import { preferenceRoutes } from "./preferences.js";
 import { calendarEventRoutes } from "./calendar-events.js";
+import { reviewRoutes } from "./reviews.js";
+import { isTranscribeEnabled } from "../services/transcribe.js";
 
 const systemRoutes = [
   {
@@ -26,6 +28,9 @@ const systemRoutes = [
       resumeRequiredStatuses: [...RESUME_REQUIRED_STATUSES],
       experienceTypes: EXPERIENCE_TYPES,
       comparisonStages: COMPARISON_STAGES,
+      // 本地转写只在常驻 Node 进程 + 配好 Python 工具时可用，线上恒 false，前端据此禁用入口
+      transcribeEnabled: isTranscribeEnabled(),
+      asrMaxUploadMb: config.asr.maxUploadMb,
     }),
   },
   {
@@ -50,6 +55,7 @@ export const routes = [
   ...experienceRoutes,
   ...preferenceRoutes,
   ...calendarEventRoutes,
+  ...reviewRoutes,
   ...aiRoutes,
 ];
 
