@@ -52,6 +52,12 @@ export const Board = {
       companyLibrary.value?.beginJob();
     }
 
+    function openJobInfo(recordId) {
+      if (!recordId) return;
+      setCurrentJob(recordId);
+      location.hash = "#/job/info";
+    }
+
     const filteredJobs = computed(() => state.jobs.filter((job) => matchesJobSearch(job, search.value)));
     const searchActive = computed(() => Boolean(search.value.trim()));
     const inStatus = (status) => byUrgency(filteredJobs.value.filter((job) => job.status === status));
@@ -169,6 +175,7 @@ export const Board = {
       isWebUrl,
       siteLinkLabel,
       setCurrentJob,
+      openJobInfo,
       isStarredJob,
       ddlLabel,
       ageLabel,
@@ -226,13 +233,13 @@ export const Board = {
               :class="{ urgent: isUrgent(job), 'deadline-mark': job.status === '待投' && isDeadlineSoon(job), 'age-mark': job.status === '待投' && !isDeadlineSoon(job) && isLongStanding(job), on: job.recordId === state.currentJobId, starred: isStarredJob(job), dragging: draggingId === job.recordId }"
               @dragstart="beginDrag(job, $event)"
               @dragend="endDrag"
-              @click="setCurrentJob(job.recordId)">
+              @click="setCurrentJob(job.recordId)" @dblclick="openJobInfo(job.recordId)">
               <div class="job-card-head">
                 <strong>{{ job.company }}</strong>
                 <button class="star-button compact" :class="{ on: isStarredJob(job) }"
                   :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
                   draggable="false"
-                  @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
+                  @click="toggleStar(job, $event)" @dblclick.stop>{{ isStarredJob(job) ? '★' : '☆' }}</button>
               </div>
               <span class="pos">{{ job.position }}</span>
               <small v-if="job.deadline" :class="{ bad: isUrgent(job) }">{{ ddlLabel(job.deadline) }}</small>
@@ -251,7 +258,7 @@ export const Board = {
           </button>
           <div v-if="showClosed" class="closedlist">
             <article v-for="job in closed" :key="job.recordId"
-              :class="{ on: job.recordId === state.currentJobId, 'deadline-mark': job.status === '待投' && isDeadlineSoon(job), 'age-mark': job.status === '待投' && !isDeadlineSoon(job) && isLongStanding(job), starred: isStarredJob(job) }" @click="setCurrentJob(job.recordId)">
+              :class="{ on: job.recordId === state.currentJobId, 'deadline-mark': job.status === '待投' && isDeadlineSoon(job), 'age-mark': job.status === '待投' && !isDeadlineSoon(job) && isLongStanding(job), starred: isStarredJob(job) }" @click="setCurrentJob(job.recordId)" @dblclick="openJobInfo(job.recordId)">
               <span class="dot" :class="'s-' + job.status"></span>
               <strong>{{ job.company }}</strong>
               <span class="pos">{{ job.position }}</span>
@@ -260,7 +267,7 @@ export const Board = {
               <span class="grow"></span>
               <button class="star-button compact" :class="{ on: isStarredJob(job) }"
                 :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
-                @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
+                @click="toggleStar(job, $event)" @dblclick.stop>{{ isStarredJob(job) ? '★' : '☆' }}</button>
             </article>
             <p v-if="!closed.length" class="muted">{{ searchActive ? '已结束里没有匹配的岗位。' : '还没有结束的岗位。' }}</p>
           </div>
@@ -273,12 +280,12 @@ export const Board = {
           <p v-else-if="!listed.length" class="muted">{{ searchActive ? '这个状态下没有匹配的岗位。' : '这个状态下没有岗位。' }}</p>
           <article v-for="job in listed" :key="job.recordId"
             :class="{ urgent: isUrgent(job), 'deadline-mark': job.status === '待投' && isDeadlineSoon(job), 'age-mark': job.status === '待投' && !isDeadlineSoon(job) && isLongStanding(job), on: detail && job.recordId === detail.recordId, starred: isStarredJob(job) }"
-            @click="setCurrentJob(job.recordId)">
+            @click="setCurrentJob(job.recordId)" @dblclick="openJobInfo(job.recordId)">
             <div class="job-card-head">
               <strong>{{ job.company }}</strong>
               <button class="star-button compact" :class="{ on: isStarredJob(job) }"
                 :title="isStarredJob(job) ? '取消星标' : '标记下一批'"
-                @click="toggleStar(job, $event)">{{ isStarredJob(job) ? '★' : '☆' }}</button>
+                @click="toggleStar(job, $event)" @dblclick.stop>{{ isStarredJob(job) ? '★' : '☆' }}</button>
             </div>
             <span class="pos">{{ job.position }}</span>
             <small v-if="job.deadline" :class="{ bad: isUrgent(job) }">{{ ddlLabel(job.deadline) }}</small>

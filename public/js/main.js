@@ -1,7 +1,7 @@
 // 应用外壳：登录闸门 → 侧边栏 + hash 路由。
 // 各功能页在 views/ 里，一个侧边栏项对应一个文件。
 import { api, token } from "./api.js";
-import { flushOutbox, loadAll, loadHealth, state } from "./store.js";
+import { flushOutbox, loadAll, loadHealth, resumeOutboxAfterAuth, state } from "./store.js";
 import { ConfirmHost } from "./ui.js";
 import { Board } from "./views/board.js";
 import { Calendar } from "./views/calendar.js";
@@ -70,6 +70,8 @@ const Gate = {
         state.authed = true;
         password.value = "";
         await loadAll();
+        resumeOutboxAfterAuth();
+        await flushOutbox();
       } catch (failure) {
         error.value = failure.message || "登录失败";
       } finally {
@@ -103,9 +105,9 @@ const App = {
     });
     async function retry() {
       await loadAll();
-      await flushOutbox();
+      await flushOutbox({ retryBlocked: true });
     }
-    return { state, route, NAV, view, snapshotAge, retry, syncNow: () => flushOutbox() };
+    return { state, route, NAV, view, snapshotAge, retry, syncNow: () => flushOutbox({ retryBlocked: true }) };
   },
   template: `
     <div v-if="!state.ready" class="boot">载入中…</div>

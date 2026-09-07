@@ -121,7 +121,7 @@ export const SCHEMAS = {
 };
 
 export const JOB_STATUSES = ["待投", "已投", "笔试", "一面", "二面", "三面", "挂", "offer"];
-export const CALENDAR_EVENT_TYPES = ["written", "interview1", "interview2", "interview3", "interview", "deadline", "other"];
+export const CALENDAR_EVENT_TYPES = ["todo", "written", "interview1", "interview2", "interview3", "interview", "deadline", "other"];
 export const JOB_STAR_VALUE = "星标";
 export const RESUME_REQUIRED_STATUSES = new Set(JOB_STATUSES.slice(1));
 export const EXPERIENCE_TYPES = ["实习经历", "项目经历", "校园经历", "荣誉/获奖", "语言/证书", "其他"];

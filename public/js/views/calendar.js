@@ -7,11 +7,13 @@ import {
   eventTypeLabel,
   eventsForDate,
   formatEventTime,
+  isCalendarEventCompleted,
   isLocalCalendarEvent,
   localDateTimeMillis,
   markStatusApplied,
   monthCells,
   normalizeCalendarEvent,
+  setCalendarEventCompleted,
   shouldOfferStatusUpdate,
   sortCalendarEvents,
   splitLocalDateTime,
@@ -184,10 +186,28 @@ export const Calendar = {
       jobPickerOpen.value = false;
     }
 
+    function resetTodoForm(day = selectedDate.value) {
+      editingId.value = "";
+      formError.value = "";
+      Object.assign(form, {
+        recordId: "",
+        type: "todo",
+        title: "",
+        startDate: day,
+        startTime: "09:00",
+        endDate: "",
+        endTime: "",
+        targetStatus: "",
+        note: "",
+      });
+      jobQuery.value = "";
+      jobPickerOpen.value = false;
+    }
+
     function applyTypeDefaults() {
       const nextStatus = defaultStatusForType(form.type);
       const currentIsDefault = CALENDAR_EVENT_TYPES.some((type) => type.defaultStatus === form.targetStatus);
-      if (!form.targetStatus || currentIsDefault) form.targetStatus = nextStatus;
+      if (form.type === "todo" || !form.targetStatus || currentIsDefault) form.targetStatus = nextStatus;
       if (!form.title || titleLooksAuto()) form.title = autoTitle();
     }
 
@@ -206,6 +226,7 @@ export const Calendar = {
       form.recordId = "";
       jobQuery.value = "";
       jobPickerOpen.value = true;
+      form.targetStatus = "";
       applyJobDefault();
     }
 
@@ -347,6 +368,21 @@ export const Calendar = {
       }
     }
 
+    async function toggleTodo(event) {
+      const completed = !eventCompleted(event);
+      const changed = setCalendarEventCompleted(event, completed);
+      try {
+        const saved = backendReady.value && !isLocalCalendarEvent(changed)
+          ? await api.patchCalendarEvent(changed.id, { statusAppliedAt: changed.statusAppliedAt })
+          : changed;
+        events.value = events.value.map((item) => item.id === event.id ? saved : item);
+        persistEvents();
+        toast(completed ? "待办已完成" : "待办已恢复");
+      } catch (failure) {
+        if (!handleError(failure)) toast(failure.message || "待办更新失败");
+      }
+    }
+
     function openJob(recordId) {
       if (!recordId) return;
       setCurrentJob(recordId);
@@ -361,7 +397,11 @@ export const Calendar = {
     }
 
     function dueStatus(event) {
-      return shouldOfferStatusUpdate(event, jobById(event.recordId));
+      return shouldOfferStatusUpdate(event, jobById(event.recordId), Date.now(), statuses.value);
+    }
+
+    function eventCompleted(event) {
+      return isCalendarEventCompleted(event, jobById(event.recordId), statuses.value);
     }
 
     function eventJobLabel(event) {
@@ -382,7 +422,7 @@ export const Calendar = {
     watch(
       () => [state.jobs.length, state.currentJobId],
       () => {
-        if (!editingId.value && !form.recordId) resetForm(selectedDate.value);
+        if (!editingId.value && !form.recordId && form.type !== "todo") resetForm(selectedDate.value);
       },
     );
 
@@ -423,6 +463,7 @@ export const Calendar = {
       editEvent,
       deleteEvent,
       applyStatus,
+      toggleTodo,
       applyTypeDefaults,
       applyJobDefault,
       selectJob,
@@ -432,12 +473,14 @@ export const Calendar = {
       formatAgendaTime,
       eventTypeLabel,
       eventJobLabel,
+      eventCompleted,
       dueStatus,
       openJob,
       selectEventDate,
       isToday,
       selectedJob,
       resetForm,
+      resetTodoForm,
     };
   },
   template: `
@@ -445,7 +488,7 @@ export const Calendar = {
       <header class="pagehead calendar-head">
         <div>
           <h2 class="ptitle">日历</h2>
-          <p class="muted">面试、笔试截止和其它时间点会同步到飞书日历表；到点后可一键写回岗位状态。</p>
+          <p class="muted">统一安排求职日程和个人待办；关联岗位的事项可在到点后写回状态。</p>
         </div>
         <span class="grow"></span>
         <div class="calendar-nav">
@@ -453,6 +496,7 @@ export const Calendar = {
           <strong>{{ monthLabel }}</strong>
           <button class="ghost" type="button" @click="shiftMonth(1)">›</button>
           <button class="ghost" type="button" @click="goToday">今天</button>
+          <button class="primary" type="button" @click="resetTodoForm(selectedDate)">新增待办</button>
         </div>
       </header>
 
@@ -472,7 +516,8 @@ export const Calendar = {
               class="calendar-day" :class="{ off: !cell.inMonth, on: selectedDate === cell.key, today: isToday(cell.key) }"
               @click="selectDate(cell.key)">
               <span class="calendar-date">{{ cell.day }}</span>
-              <span v-for="event in cell.events.slice(0, 3)" :key="event.id" class="calendar-chip">
+              <span v-for="event in cell.events.slice(0, 3)" :key="event.id" class="calendar-chip"
+                :class="{ completed: eventCompleted(event), todo: event.type === 'todo' }">
                 <b>{{ formatEventTime(event) }}</b>{{ event.title }}
               </span>
               <em v-if="cell.events.length > 3">+{{ cell.events.length - 3 }}</em>
@@ -487,7 +532,8 @@ export const Calendar = {
               <span class="pill">{{ selectedEvents.length }} 项</span>
             </div>
             <p v-if="!selectedEvents.length" class="muted calendar-empty">这天还没有安排。</p>
-            <article v-for="event in selectedEvents" :key="event.id" class="calendar-event">
+            <article v-for="event in selectedEvents" :key="event.id" class="calendar-event"
+              :class="{ completed: eventCompleted(event), todo: event.type === 'todo' }">
               <header>
                 <span class="dot" :class="'s-' + (event.targetStatus || '待投')"></span>
                 <div>
@@ -501,10 +547,14 @@ export const Calendar = {
               <p v-if="event.note" class="calendar-note">{{ event.note }}</p>
               <p v-if="event.targetStatus" class="muted">绑定状态：{{ event.targetStatus }}</p>
               <div class="calendar-event-actions">
+                <button v-if="event.type === 'todo'" :class="eventCompleted(event) ? 'ghost' : 'primary'"
+                  type="button" @click="toggleTodo(event)">
+                  {{ eventCompleted(event) ? '恢复待办' : '标记完成' }}
+                </button>
                 <button v-if="dueStatus(event)" class="primary" type="button" @click="applyStatus(event)">
                   更新为「{{ event.targetStatus }}」
                 </button>
-                <span v-else-if="event.statusAppliedAt" class="pill ok">已写回状态</span>
+                <span v-else-if="eventCompleted(event)" class="pill calendar-completed-pill">已完成</span>
                 <button class="link" type="button" @click="editEvent(event)">编辑</button>
                 <button class="danger-link" type="button" @click="deleteEvent(event)">删除</button>
               </div>
@@ -518,7 +568,7 @@ export const Calendar = {
             </div>
             <div class="calendar-form">
               <div class="calendar-job-picker wide">
-                <span>关联岗位</span>
+                <span>关联岗位（可选）</span>
                 <div v-if="selectedJob" class="calendar-selected-job">
                   <button class="link" type="button" @click="openJob(selectedJob.recordId)">
                     {{ selectedJob.company }} · {{ selectedJob.position }}
@@ -566,7 +616,7 @@ export const Calendar = {
                 <span>结束时间</span>
                 <input v-model="form.endTime" type="time">
               </label>
-              <label class="wide">
+              <label v-if="selectedJob && form.type !== 'todo'" class="wide">
                 <span>到点后提醒更新状态</span>
                 <select v-model="form.targetStatus">
                   <option value="">不绑定状态</option>
@@ -590,6 +640,7 @@ export const Calendar = {
           <section v-if="upcomingEvents.length" class="calendar-card compact">
             <h3>接下来</h3>
             <button v-for="event in upcomingEvents" :key="event.id" type="button" class="calendar-upcoming"
+              :class="{ completed: eventCompleted(event), todo: event.type === 'todo' }"
               @click="selectEventDate(event)">
               <span>{{ formatAgendaTime(event) }}</span>
               <strong>{{ event.title }}</strong>

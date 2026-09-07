@@ -109,3 +109,30 @@ test("calendar event route rejects invalid ranges and statuses", async () => {
     config.lark.mock = originalMock;
   }
 });
+
+test("calendar event routes support standalone todos", async () => {
+  const originalMock = config.lark.mock;
+  config.lark.mock = true;
+  try {
+    const created = await route("POST", "/api/calendar-events").handler({
+      body: {
+        type: "todo",
+        title: "提交课程作业",
+        startsAt: 1787061600000,
+        recordId: "",
+        targetStatus: "",
+      },
+    });
+    assert.equal(created.type, "todo");
+    assert.equal(created.recordId, "");
+    assert.equal(created.targetStatus, "");
+
+    const completed = await route("PATCH", "/api/calendar-events/:recordId").handler({
+      params: { recordId: created.id },
+      body: { statusAppliedAt: 1787065300000 },
+    });
+    assert.equal(completed.statusAppliedAt, 1787065300000);
+  } finally {
+    config.lark.mock = originalMock;
+  }
+});

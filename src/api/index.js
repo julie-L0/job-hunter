@@ -40,6 +40,11 @@ const systemRoutes = [
     handler: ({ body, headers }) => createSession(body.password, headers),
   },
   {
+    method: "GET",
+    path: "/api/auth/session",
+    handler: () => ({ authenticated: true }),
+  },
+  {
     // 比对飞书里的真实字段类型和 schema.js，排查字段漂移
     method: "GET",
     path: "/api/debug/fields/:tableKey",

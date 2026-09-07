@@ -1,6 +1,9 @@
 const DAY = 86_400_000;
+const DEFAULT_JOB_STATUS_ORDER = ["待投", "已投", "笔试", "一面", "二面", "三面", "挂", "offer"];
+const CLOSED_JOB_STATUSES = new Set(["挂", "offer"]);
 
 export const CALENDAR_EVENT_TYPES = [
+  { value: "todo", label: "待办", defaultStatus: "" },
   { value: "written", label: "笔试截止", defaultStatus: "笔试" },
   { value: "interview1", label: "一面", defaultStatus: "一面" },
   { value: "interview2", label: "二面", defaultStatus: "二面" },
@@ -107,6 +110,24 @@ export function eventEndAt(event) {
   return Number(event?.endsAt || event?.startsAt || 0);
 }
 
+export function isCalendarEventCompleted(event, job, statusOrder = DEFAULT_JOB_STATUS_ORDER) {
+  if (event?.statusAppliedAt) return true;
+
+  const target = clean(event?.targetStatus);
+  const current = clean(job?.status);
+  if (!target || !current) return false;
+  if (current === target) return true;
+  if (CLOSED_JOB_STATUSES.has(target)) return false;
+  if (CLOSED_JOB_STATUSES.has(current)) return true;
+
+  const stages = (Array.isArray(statusOrder) && statusOrder.length ? statusOrder : DEFAULT_JOB_STATUS_ORDER)
+    .map(clean)
+    .filter((status) => status && !CLOSED_JOB_STATUSES.has(status));
+  const targetIndex = stages.indexOf(target);
+  const currentIndex = stages.indexOf(current);
+  return targetIndex >= 0 && currentIndex > targetIndex;
+}
+
 export function eventsForDate(events, key) {
   return sortCalendarEvents(events).filter((event) => {
     const start = dateKey(event.startsAt);
@@ -142,13 +163,16 @@ export function formatEventTime(event) {
   return `${start.date} ${start.time} - ${end.date} ${end.time}`;
 }
 
-export function shouldOfferStatusUpdate(event, job, now = Date.now()) {
+export function shouldOfferStatusUpdate(event, job, now = Date.now(), statusOrder = DEFAULT_JOB_STATUS_ORDER) {
   const target = clean(event?.targetStatus);
-  if (!target || !job || event?.statusAppliedAt) return false;
-  if (clean(job.status) === target) return false;
+  if (!target || !job || isCalendarEventCompleted(event, job, statusOrder)) return false;
   return eventEndAt(event) <= now;
 }
 
 export function markStatusApplied(event, now = Date.now()) {
   return normalizeCalendarEvent({ ...event, statusAppliedAt: now }, now);
+}
+
+export function setCalendarEventCompleted(event, completed, now = Date.now()) {
+  return normalizeCalendarEvent({ ...event, statusAppliedAt: completed ? now : null }, now);
 }

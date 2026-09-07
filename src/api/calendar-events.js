@@ -6,6 +6,7 @@ const clean = (value) => String(value ?? "").trim();
 
 function fallbackTitle(type) {
   return ({
+    todo: "待办",
     written: "笔试截止",
     interview1: "一面",
     interview2: "二面",

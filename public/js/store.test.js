@@ -27,9 +27,10 @@ const {
   dropJob,
   flushOutbox,
   mergeJob,
+  resumeOutboxAfterAuth,
   state,
 } = await import(`./store.js?test=${Date.now()}`);
-const { api, NetError } = await import("./api.js");
+const { api, AuthError, NetError } = await import("./api.js");
 
 function resetStore() {
   state.health = { resumeRequiredStatuses: ["已投", "笔试", "一面", "二面", "三面", "挂", "offer"] };
@@ -152,6 +153,84 @@ test("flushOutbox does not replay remaining reverse status patches twice", async
     assert.equal(state.outbox.length, 1);
     assert.equal(state.outbox[0].id, "back-to-applied");
     assert.equal(state.offline, true);
+  } finally {
+    api.patchJob = originalPatchJob;
+  }
+});
+
+test("re-login restores outbox work paused by an expired session", async () => {
+  resetStore();
+  const originalPatchJob = api.patchJob;
+  state.jobs = [{ recordId: "job-auth", company: "Example", position: "Role", status: "待投" }];
+  state.outbox = [{
+    id: "expired-session-change",
+    kind: "job.patch",
+    recordId: "job-auth",
+    patch: { resumeId: "R2" },
+    statusChange: null,
+    blocked: false,
+  }];
+  api.patchJob = async () => { throw new AuthError("session expired"); };
+
+  try {
+    await flushOutbox();
+    assert.equal(state.authed, false);
+    assert.equal(state.outbox[0].authBlocked, true);
+    assert.equal(state.outbox[0].blocked, true);
+
+    state.authed = true;
+    resumeOutboxAfterAuth();
+    assert.equal(state.outbox[0].authBlocked, false);
+    assert.equal(state.outbox[0].blocked, false);
+    assert.equal(state.outbox[0].error, "");
+  } finally {
+    api.patchJob = originalPatchJob;
+  }
+});
+
+test("re-login also restores legacy auth-blocked outbox items", () => {
+  resetStore();
+  state.outbox = [{
+    id: "legacy-expired-session-change",
+    kind: "job.patch",
+    recordId: "job-auth",
+    patch: { resumeId: "R2" },
+    statusChange: null,
+    blocked: true,
+    error: "登录已失效，请重新输入",
+  }];
+
+  resumeOutboxAfterAuth();
+
+  assert.equal(state.outbox[0].blocked, false);
+  assert.equal(state.outbox[0].error, "");
+});
+
+test("manual sync retries blocked non-auth outbox items", async () => {
+  resetStore();
+  state.jobs = [{ recordId: "job-retry", company: "Example", position: "Role", status: "寰呮姇" }];
+  state.outbox = [{
+    id: "fetch-failed",
+    kind: "job.patch",
+    recordId: "job-retry",
+    patch: { note: "updated" },
+    statusChange: null,
+    blocked: true,
+    error: "fetch failed",
+    attempts: 1,
+  }];
+  const originalPatchJob = api.patchJob;
+  let calls = 0;
+  api.patchJob = async () => {
+    calls += 1;
+    return { job: { recordId: "job-retry", status: "寰呮姇", note: "updated" } };
+  };
+
+  try {
+    await flushOutbox({ retryBlocked: true });
+    assert.equal(calls, 1);
+    assert.equal(state.outbox.length, 0);
+    assert.equal(state.syncError, "");
   } finally {
     api.patchJob = originalPatchJob;
   }

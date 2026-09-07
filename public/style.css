@@ -799,6 +799,13 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
   line-height: 1.45;
 }
 .calendar-chip b { margin-right: 4px; font-weight: 600; }
+.calendar-chip.completed {
+  color: var(--dim);
+  background: #f3f2ef;
+  border-color: var(--line);
+  text-decoration: line-through;
+}
+.calendar-chip.todo:not(.completed) { color: #215c45; background: #edf7f1; border-color: #b9dcc9; }
 .calendar-day em { color: var(--dim); font-size: 11px; font-style: normal; }
 .calendar-sidepanel { display: grid; gap: 12px; }
 .calendar-card {
@@ -821,6 +828,12 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 .calendar-event header { display: flex; align-items: flex-start; gap: 8px; }
 .calendar-event header strong { display: block; line-height: 1.45; overflow-wrap: anywhere; }
 .calendar-event header p, .calendar-event > p { margin: 2px 0 0; color: var(--dim); font-size: 12px; }
+.calendar-event.completed header strong { color: var(--dim); text-decoration: line-through; }
+.calendar-event.completed .calendar-job-link,
+.calendar-event.completed .calendar-note { color: var(--dim) !important; }
+.calendar-event.completed .dot { background: #aaa59e; }
+.calendar-event.todo:not(.completed) .dot { background: #2f805f; }
+.calendar-completed-pill { color: var(--dim); background: #f3f2ef; border-color: var(--line); }
 .calendar-job-link { margin-top: 6px; text-align: left; }
 .calendar-note { white-space: pre-wrap; color: var(--ink) !important; }
 .calendar-event-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
@@ -870,6 +883,9 @@ input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-col
 }
 .calendar-upcoming span { color: var(--dim); font-size: 12px; }
 .calendar-upcoming strong { overflow-wrap: anywhere; font-size: 13px; }
+.calendar-upcoming.completed { color: var(--dim); }
+.calendar-upcoming.completed strong { text-decoration: line-through; }
+.calendar-upcoming.todo:not(.completed) strong { color: #215c45; }
 
 /* ---- 岗位比较 ---- */
 

@@ -159,7 +159,15 @@ export async function loadHealth() {
     state.health = await api.health();
     state.authRequired = state.health.authRequired !== false;
     if (!state.authRequired) state.authed = true;
-    else if (token.get()) state.authed = true; // 真伪由第一次拉数据时的 401 判定
+    else if (state.authRequired && token.get()) {
+      state.authed = true;
+      try {
+        await api.session();
+        state.authed = true;
+      } catch (error) {
+        handleError(error);
+      }
+    }
   } catch (error) {
     handleError(error);
   }
@@ -323,8 +331,22 @@ async function syncOutboxItem(item) {
   }
 }
 
-export async function flushOutbox() {
+function isLegacyAuthBlocked(item) {
+  const message = String(item?.error || "");
+  return message.includes("登录已失效") || message.includes("口令失效");
+}
+
+export async function flushOutbox({ retryBlocked = false } = {}) {
   if (state.syncing || !state.outbox.length || !state.authed) return;
+  resumeOutboxAfterAuth();
+  if (retryBlocked) {
+    const items = state.outbox.map((item) => (
+      item.blocked && !item.authBlocked && !isLegacyAuthBlocked(item)
+        ? { ...item, blocked: false, attempts: 0, error: "", updatedAt: Date.now() }
+        : item
+    ));
+    if (items.some((item, index) => item !== state.outbox[index])) persistOutbox(items);
+  }
   state.syncing = true;
   repairOutbox();
   if (!state.outbox.some((item) => !item.blocked)) {
@@ -346,6 +368,7 @@ export async function flushOutbox() {
           failed.error = error.message || "同步失败";
           failed.updatedAt = Date.now();
           failed.blocked = !(error instanceof NetError);
+          failed.authBlocked = error instanceof AuthError;
           persistOutbox(items);
         }
         if (error instanceof NetError) {
@@ -355,12 +378,21 @@ export async function flushOutbox() {
         }
         handleError(error);
         state.syncError = error.message || "同步失败";
+        if (error instanceof AuthError) break;
       }
     }
     repairOutbox();
   } finally {
     state.syncing = false;
   }
+}
+
+export function resumeOutboxAfterAuth() {
+  const items = state.outbox.map((item) => (item.authBlocked || isLegacyAuthBlocked(item))
+    ? { ...item, authBlocked: false, blocked: false, attempts: 0, error: "", updatedAt: Date.now() }
+    : item);
+  if (items.some((item, index) => item !== state.outbox[index])) persistOutbox(items);
+  state.syncError = "";
 }
 
 export function mergeResume(resume) {
