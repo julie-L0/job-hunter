@@ -47,14 +47,15 @@ def decode_to_pcm(audio_path):
     m4a/mp3/aac 这些容器 sherpa-onnx 读不了，只能读 wav；而面试录音基本都是 m4a。
     走 ffmpeg 而不是引入 Python 解码库，是为了不给这个工具再堆依赖。
     """
+    ffmpeg = os.environ.get("ASR_FFMPEG", "ffmpeg")
     command = [
-        "ffmpeg", "-nostdin", "-loglevel", "error", "-i", audio_path,
+        ffmpeg, "-nostdin", "-loglevel", "error", "-i", audio_path,
         "-f", "s16le", "-acodec", "pcm_s16le", "-ac", "1", "-ar", str(SAMPLE_RATE), "-",
     ]
     try:
         result = subprocess.run(command, capture_output=True, check=False)
     except FileNotFoundError:
-        die("找不到 ffmpeg，请先安装并加入 PATH（winget install --id Gyan.FFmpeg -e）")
+        die("找不到 ffmpeg，请安装后加入 PATH，或配置 ASR_FFMPEG 指向 ffmpeg.exe")
     if result.returncode != 0:
         tail = (result.stderr or b"").decode("utf8", "replace").strip().splitlines()
         die("ffmpeg 解码失败：" + (tail[-1] if tail else f"退出码 {result.returncode}"))

@@ -16,14 +16,15 @@ const JOB_TTL_MS = 30 * 60 * 1000;
 
 export function isTranscribeEnabled() {
   // VERCEL 由平台注入，本地永远没有。放在最前面，避免线上因为误配环境变量而尝试 spawn。
-  const { pythonPath, scriptPath, modelDir } = config.asr;
+  const { pythonPath, scriptPath, modelDir, ffmpegPath } = config.asr;
   if (!pythonPath || !scriptPath || !modelDir) return false;
+  if (ffmpegPath && !existsSync(ffmpegPath)) return false;
   return existsSync(pythonPath) && existsSync(scriptPath) && existsSync(modelDir);
 }
 
 export function assertTranscribeEnabled() {
   if (!isTranscribeEnabled()) {
-    throw new HttpError(400, "本地转写未启用：线上环境不支持，本地需配置 ASR_PYTHON / ASR_SCRIPT / ASR_MODEL_DIR");
+    throw new HttpError(400, "本地转写未启用：线上环境不支持，本地需配置 ASR_PYTHON / ASR_SCRIPT / ASR_MODEL_DIR，并确认 ASR_FFMPEG（如配置）路径存在");
   }
 }
 
@@ -91,7 +92,11 @@ export function startTranscribeJob({ filePath, originalName = "" }) {
       stdio: ["ignore", "pipe", "pipe"],
       // 脚本自己也会 reconfigure，这里再固定一次：下面是按 utf8 读的，
       // Windows 中文系统上 Python 默认会按 cp936 写管道，不对齐就整段中文乱码
-      env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+      env: {
+        ...process.env,
+        PYTHONIOENCODING: "utf-8",
+        ...(config.asr.ffmpegPath ? { ASR_FFMPEG: config.asr.ffmpegPath } : {}),
+      },
     },
   );
 

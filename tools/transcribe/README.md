@@ -62,10 +62,11 @@ models/silero_vad.onnx     ~2MB
 ASR_PYTHON=C:\...\job-hunter\tools\transcribe\.venv\Scripts\python.exe
 ASR_SCRIPT=C:\...\job-hunter\tools\transcribe\transcribe.py
 ASR_MODEL_DIR=C:\...\job-hunter\tools\transcribe\models
+ASR_FFMPEG=C:\path\to\ffmpeg.exe
 ASR_MAX_UPLOAD_MB=1024
 ```
 
-三项路径任意一项缺失或不存在，`isTranscribeEnabled()` 就返回 `false`，页面上的
+前三项路径任意一项缺失或不存在，或 `ASR_FFMPEG` 已配置但路径不存在，`isTranscribeEnabled()` 就返回 `false`，页面上的
 录音入口自动消失——不会报错，只是没有那个按钮。
 
 ## 单独跑一次（排查用）

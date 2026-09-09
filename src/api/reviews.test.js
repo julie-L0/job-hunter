@@ -93,6 +93,19 @@ test("GET /api/reviews filters by job and sorts newest first", async () => {
   });
 });
 
+test("GET /api/reviews stays usable when the optional index table is not configured", async () => {
+  const originalMock = config.lark.mock;
+  const originalReviewTable = config.lark.tables.review;
+  config.lark.mock = false;
+  config.lark.tables.review = "";
+  try {
+    assert.deepEqual(await route("GET", "/api/reviews").handler({ query: { jobRecordId: "job-1" } }), []);
+  } finally {
+    config.lark.mock = originalMock;
+    config.lark.tables.review = originalReviewTable;
+  }
+});
+
 test("GET /api/reviews/transcribe/:jobId reports 400 when transcription is off", async () => {
   const original = { ...config.asr };
   try {

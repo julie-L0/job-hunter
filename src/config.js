@@ -30,6 +30,7 @@ export const config = {
     pythonPath: process.env.ASR_PYTHON || "",
     scriptPath: process.env.ASR_SCRIPT || "",
     modelDir: process.env.ASR_MODEL_DIR || "",
+    ffmpegPath: process.env.ASR_FFMPEG || "",
     maxUploadMb: Number(process.env.ASR_MAX_UPLOAD_MB || 1024),
   },
 

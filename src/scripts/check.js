@@ -12,6 +12,10 @@ function line(ok, text) {
 }
 
 async function checkTable(tableKey) {
+  if (tableKey === "review" && !config.lark.tables.review) {
+    console.log("! review：未配置 BITABLE_TABLE_REVIEW（文档保存仍可用，复盘索引跳过）");
+    return true;
+  }
   const expected = SCHEMAS[tableKey].fields;
   const actual = await listFields(tableKey);
   const byName = new Map(actual.map((field) => [field.name, field]));

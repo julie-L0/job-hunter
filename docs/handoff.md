@@ -72,6 +72,7 @@ APP_PASSWORD=
 ASR_PYTHON=
 ASR_SCRIPT=
 ASR_MODEL_DIR=
+ASR_FFMPEG=
 ASR_MAX_UPLOAD_MB=1024
 ```
 
@@ -99,9 +100,10 @@ ASR_MAX_UPLOAD_MB=1024
    ASR_PYTHON=C:\path\to\job-hunter\tools\transcribe\.venv\Scripts\python.exe
    ASR_SCRIPT=C:\path\to\job-hunter\tools\transcribe\transcribe.py
    ASR_MODEL_DIR=C:\path\to\job-hunter\tools\transcribe\models
+   ASR_FFMPEG=C:\path\to\ffmpeg.exe
    ASR_MAX_UPLOAD_MB=1024
    ```
-   三个路径必须都存在，否则录音入口不会出现（这是有意的：宁可隐藏入口，也不要让用户上传完才报错）。
+   Python、脚本和模型目录必须存在；如果配置了 `ASR_FFMPEG`，该文件也必须存在，否则录音入口不会出现（这是有意的：宁可隐藏入口，也不要让用户上传完才报错）。
 5. 重启 `npm run dev`，在岗位的 Mock 面试页切到「真实面试复盘」，应能看到「选择音频 / MP4 文件」。
 
 实测参考：16 逻辑核笔记本 CPU、int8 模型、默认 8 线程，5 分钟音频转写耗时 7.9 秒（约 38 倍实时），一小时录音大致 2–5 分钟。这个数字是用干净语音循环拼接的样本测的，真实面试录音有底噪和长段连续说话，会慢一些，但量级不变。转写期间浏览器页面不能关（job 存在服务进程内存里，只保留 30 分钟）。

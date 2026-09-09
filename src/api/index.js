@@ -31,6 +31,7 @@ const systemRoutes = [
       // 本地转写只在常驻 Node 进程 + 配好 Python 工具时可用，线上恒 false，前端据此禁用入口
       transcribeEnabled: isTranscribeEnabled(),
       asrMaxUploadMb: config.asr.maxUploadMb,
+      reviewTableConfigured: config.lark.mock || Boolean(config.lark.tables.review),
     }),
   },
   {

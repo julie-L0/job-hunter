@@ -119,6 +119,7 @@ export const RealReview = {
     const transcribing = ref(false);
     const progress = ref(0);
     const pasteText = ref("");
+    const saveWarning = ref("");
     let timer = null;
 
     const scope = computed(() => state.currentJobId);
@@ -138,6 +139,7 @@ export const RealReview = {
     });
 
     const canTranscribe = computed(() => Boolean(state.health.transcribeEnabled));
+    const reviewTableConfigured = computed(() => state.health.reviewTableConfigured !== false);
     const uploadLimitMb = computed(() => Number(state.health.asrMaxUploadMb) || 1024);
     const hasTranscript = computed(() => draft.transcript.trim().length > 0);
     const saved = computed(() => Boolean(draft.savedRecordId || draft.savedDocUrl));
@@ -154,6 +156,7 @@ export const RealReview = {
       if (busy.value) return null;
       busy.value = true;
       error.value = "";
+      saveWarning.value = "";
       try {
         return await action();
       } catch (failure) {
@@ -265,6 +268,7 @@ export const RealReview = {
       draft.comment = null;
       draft.mock = false;
       error.value = "";
+      saveWarning.value = "";
     }
 
     const payloadBase = () => ({
@@ -294,9 +298,13 @@ export const RealReview = {
         });
         draft.savedDocUrl = result.docUrl || "";
         draft.savedRecordId = result.review?.recordId || "";
-        if (result.writeBackError) {
-          // 文档已经建好了，只是表没写上。绝不能让用户以为内容丢了
-          error.value = `文档已建好，但复盘表没写上：${result.writeBackError}`;
+        if (result.writeBackError || result.accessWarning) {
+          // 文档已经建好了，索引表是可选能力，不能让用户以为内容丢了。
+          const warnings = [
+            result.writeBackError ? `复盘索引未写入：${result.writeBackError}` : "",
+            result.accessWarning ? `文档授权提醒：${result.accessWarning}` : "",
+          ].filter(Boolean);
+          saveWarning.value = `文档已创建，但有后续提醒：${warnings.join("；")}`;
         } else {
           toast("已保存到飞书");
         }
@@ -332,6 +340,8 @@ export const RealReview = {
     return {
       state, job, jobReady, busy, error, draft, reviews, loadingList, uploading, transcribing,
       progress, pasteText, canTranscribe, uploadLimitMb, hasTranscript, saved, docStats, ROUNDS, ROLE_NAMES,
+      reviewTableConfigured,
+      saveWarning,
       timestamp, dayStr: (ms) => (ms ? new Date(ms).toISOString().slice(0, 10) : "—"),
       progressText: computed(() => `${Math.round(progress.value * 100)}%`),
       pickAudio, usePaste, pickTxt, changeTranscript, generateComment, save, appendTo, reset,
@@ -346,6 +356,7 @@ export const RealReview = {
         <span class="grow"></span>
         <button class="ghost" @click="reset">清空草稿</button>
       </div>
+      <p v-if="!reviewTableConfigured" class="notice">复盘索引表未配置：仍可导入文本、生成点评并创建/打开飞书复盘文档；只是不会显示历史复盘索引。文档保存不受影响。</p>
 
       <div class="fields">
         <div class="field">
@@ -379,7 +390,7 @@ export const RealReview = {
         <div class="qcard">
           <p class="dtitle">粘贴转写文本</p>
           <p class="muted">一行一段。带 <code>[00:03:12] 面试官：</code> 前缀的会自动识别时间和角色。</p>
-          <textarea rows="6" v-model="pasteText" :disabled="state.offline"
+          <textarea rows="6" v-model="pasteText"
             placeholder="[00:00:12] 面试官：先自我介绍一下&#10;[00:00:20] 我：我是……"></textarea>
           <div class="drow">
             <button class="primary" :disabled="!pasteText.trim()" @click="usePaste">用这段文本</button>
@@ -401,11 +412,11 @@ export const RealReview = {
         </div>
         <p class="muted">直接校对整篇文档即可。每行可写成 <code>[00:03:12] 面试官：内容</code>，角色支持 <span v-for="role in ROLE_NAMES" :key="role" class="pill">{{ role }}</span>；没写角色的行保存时会按规则补成「面试官」或「我」。</p>
 
-        <textarea class="review-doc" rows="22" v-model="draft.transcript" :disabled="state.offline" spellcheck="false"
+        <textarea class="review-doc" rows="22" v-model="draft.transcript" spellcheck="false"
           placeholder="[00:00:12] 面试官：先自我介绍一下&#10;[00:00:20] 我：我是……&#10;[00:08:10] 其他面试者：我补充一个问题……"></textarea>
 
         <h3 class="review-h">我的补充</h3>
-        <textarea rows="4" v-model="draft.myNote" :disabled="state.offline"
+        <textarea rows="4" v-model="draft.myNote"
           placeholder="录音听不出来的东西：面试官的表情、我当时慌在哪、事后想到的更好答案……"></textarea>
 
         <div class="strip">
@@ -441,13 +452,14 @@ export const RealReview = {
           <p v-if="draft.comment.takeaway" class="notice">{{ draft.comment.takeaway }}</p>
         </section>
 
-        <div class="strip">
+      <div class="strip">
           <button class="primary" :disabled="busy || state.offline || saved" @click="save">
-            {{ saved ? '已保存' : (busy ? '保存中…' : '保存到飞书') }}
+            {{ saved ? '文档已保存' : (busy ? '保存中…' : '保存为飞书文档') }}
           </button>
           <a v-if="draft.savedDocUrl" :href="draft.savedDocUrl" target="_blank" rel="noopener">打开复盘文档</a>
-          <span v-else class="muted">保存时会新建一份飞书文档写正文，并在复盘表里记一条。</span>
+          <span v-else class="muted">可直接粘贴文档内容或导入 txt；保存会新建飞书文档，复盘索引表未配置也不影响文档。</span>
         </div>
+        <p v-if="saveWarning" class="notice">{{ saveWarning }}</p>
       </template>
 
       <section class="review">

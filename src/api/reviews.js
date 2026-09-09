@@ -16,8 +16,10 @@ import {
   validateReviewInput,
 } from "../services/review.js";
 import { REVIEW_COMMENT_STATUSES } from "../storage/schema.js";
+import { config } from "../config.js";
 
 const clean = (value) => String(value ?? "").trim();
+const reviewTableAvailable = () => config.lark.mock || Boolean(config.lark.tables.review);
 
 function hydrateReview(record) {
   return {
@@ -91,6 +93,7 @@ export const reviewRoutes = [
     method: "GET",
     path: "/api/reviews",
     handler: async ({ query }) => {
+      if (!reviewTableAvailable()) return [];
       const jobRecordId = clean(query.jobRecordId);
       const records = (await listRecords("review")).map(hydrateReview);
       const filtered = jobRecordId
@@ -170,13 +173,25 @@ export const reviewRoutes = [
       // 文档已经建成了，写表失败不能把内容一起丢掉——沿用 prep-doc 的降级方式
       let review = null;
       let writeBackError = null;
-      try {
-        review = hydrateReview(await createRecord("review", patch));
-      } catch (error) {
-        writeBackError = error.message;
+      if (reviewTableAvailable()) {
+        try {
+          review = hydrateReview(await createRecord("review", patch));
+        } catch (error) {
+          writeBackError = error.message;
+        }
+      } else {
+        writeBackError = "复盘表未配置；文档已创建，后续可在 .env 配置 BITABLE_TABLE_REVIEW 后补齐索引";
       }
 
-      return { review, docUrl: doc.url, documentId: doc.documentId, truncated, writeBackError };
+      return {
+        review,
+        docUrl: doc.url,
+        documentId: doc.documentId,
+        truncated,
+        writeBackError,
+        accessWarning: doc.grant?.error || "",
+        reviewTableConfigured: reviewTableAvailable(),
+      };
     },
   },
   {
@@ -184,6 +199,7 @@ export const reviewRoutes = [
     method: "POST",
     path: "/api/reviews/:recordId/append",
     handler: async ({ params, body }) => {
+      if (!reviewTableAvailable()) throw new HttpError(409, "复盘表未配置，当前只能打开已创建的文档");
       const review = hydrateReview(await getRecord("review", params.recordId));
       if (!review.docUrl) throw new HttpError(400, "这条复盘还没有文档，无法追加");
 
